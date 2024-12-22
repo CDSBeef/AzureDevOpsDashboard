@@ -1,0 +1,22 @@
+﻿@inherits LayoutComponentBase
+
+<PageTitle>Azure DevOps Dashboard</PageTitle>
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://dev.azure.com" target="_blank">Azure DevOps</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<link href="_content/Radzen.Blazor/css/default-base.css" rel="stylesheet">
+<script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>

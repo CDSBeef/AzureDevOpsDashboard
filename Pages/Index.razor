@@ -1,0 +1,295 @@
+﻿@page "/"
+@using AzureDevOpsDashboard.Services
+@using AzureDevOpsDashboard.Data
+@inject IAzureDevOpsService AzureDevOpsService
+@inject ITokenService TokenService
+@inject IConfiguration Configuration
+@inject ILogger<Index> Logger
+
+<PageTitle>Azure DevOps Dashboard</PageTitle>
+
+<div class="container">
+    <div class="token-input @(_tokenVerified ? "d-none" : "")">
+        <input type="password" 
+               @bind="_token" 
+               @bind:event="oninput"
+               placeholder="Enter Azure DevOps PAT Token" />
+        <button class="btn btn-primary" @onclick="SetToken">Set Token</button>
+    </div>
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mt-3">@_error</div>
+    }
+
+    @if (_tokenVerified)
+    {
+        @if (_loading)
+        {
+            <div class="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (_error != null)
+        {
+            <div class="alert alert-danger">
+                <h4>Error</h4>
+                <p>@_error</p>
+                <button class="btn btn-primary" @onclick="RefreshData">Retry</button>
+            </div>
+        }
+        else
+        {
+            <div class="dashboard">
+                <div class="section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Pull Requests (@_pullRequests.Count)</h2>
+                        </div>
+                        <div class="card-body">
+                            @if (_pullRequestsByStatus.Any())
+                            {
+                                <div style="height: 300px">
+                                    <RadzenChart>
+                                        <RadzenPieSeries Data="@_pullRequestsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                                    </RadzenChart>
+                                </div>
+                                <div class="list mt-3">
+                                    @foreach (var pr in _pullRequests)
+                                    {
+                                        <div class="item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold">@pr.Title</span>
+                                                <span class="badge bg-primary">@pr.Status</span>
+                                            </div>
+                                            <div class="text-muted small">
+                                                Created by @pr.CreatedBy on @pr.CreatedDate.ToString("MMM dd, yyyy")
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-info">
+                                    No pull requests found
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Build Status (@_builds.Count)</h2>
+                        </div>
+                        <div class="card-body">
+                            @if (_buildsByStatus.Any())
+                            {
+                                <div style="height: 300px">
+                                    <RadzenChart>
+                                        <RadzenColumnSeries Data="@_buildsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                                    </RadzenChart>
+                                </div>
+                                <div class="list mt-3">
+                                    @foreach (var build in _builds)
+                                    {
+                                        <div class="item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold">@build.Definition</span>
+                                                <span class="badge @(build.Status == "succeeded" ? "bg-success" : "bg-danger")">@build.Status</span>
+                                            </div>
+                                            <div class="text-muted small">
+                                                Started: @build.StartTime.ToString("MMM dd, yyyy HH:mm")
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-info">
+                                    No builds found
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Release Stages (@_releaseStages.Count)</h2>
+                        </div>
+                        <div class="card-body">
+                            @if (_releaseStages.Any())
+                            {
+                                <div style="height: 300px">
+                                    <RadzenChart>
+                                        <RadzenBarSeries Data="@_releaseStages" CategoryProperty="Name" ValueProperty="DeploymentsCount" />
+                                    </RadzenChart>
+                                </div>
+                                <div class="list mt-3">
+                                    @foreach (var stage in _releaseStages)
+                                    {
+                                        <div class="item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold">@stage.Name</span>
+                                                <span class="badge bg-info">@stage.DeploymentsCount deployments</span>
+                                            </div>
+                                            <div class="text-muted small">
+                                                Status: @stage.Status
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-info">
+                                    No release stages found
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button class="btn btn-secondary" @onclick="RefreshData" disabled="@string.IsNullOrEmpty(_token)">Refresh Data</button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string _token = string.Empty;
+    private List<PullRequest> _pullRequests = new();
+    private List<BuildInfo> _builds = new();
+    private List<ReleaseStage> _releaseStages = new();
+    private List<ChartData> _pullRequestsByStatus = new();
+    private List<ChartData> _buildsByStatus = new();
+    private bool _loading = false;
+    private string? _error;
+    private bool _tokenVerified = false;
+
+    private class ChartData
+    {
+        public required string Category { get; set; }
+        public int Count { get; set; }
+    }
+
+    // Remove or comment out OnInitializedAsync entirely:
+    /*
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Logger.LogInformation("Initializing dashboard");
+            var token = await TokenService.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                _token = token;
+                Logger.LogInformation("Token retrieved successfully during initialization");
+                await RefreshData();
+            }
+            else
+            {
+                Logger.LogWarning("Token is empty during initialization");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during initialization");
+            _error = ex.Message;
+        }
+    }
+    */
+
+    private async Task SetToken()
+    {
+        Logger.LogInformation("SetToken button clicked with token length: {Length}", _token?.Length ?? 0);
+        try
+        {
+            if (string.IsNullOrEmpty(_token))
+            {
+                _error = "Token cannot be empty";
+                return;
+            }
+
+            _loading = true;
+            _error = null;
+            
+            await TokenService.SetTokenAsync(_token);
+            var verifiedToken = await TokenService.GetTokenAsync();
+            
+            if (string.IsNullOrEmpty(verifiedToken))
+            {
+                throw new Exception("Token verification failed");
+            }
+
+            _tokenVerified = true;
+            await RefreshData();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to set token: {ex.Message}";
+            _tokenVerified = false;
+            _token = string.Empty;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        if (!_tokenVerified)
+        {
+            _error = "Please set a valid token first";
+            return;
+        }
+
+        try
+        {
+            _loading = true;
+            _error = null;
+            Logger.LogInformation("Refreshing dashboard data with verified token");
+
+            _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
+            Logger.LogInformation("Retrieved {Count} pull requests", _pullRequests.Count);
+
+            _builds = await AzureDevOpsService.GetBuildsAsync();
+            Logger.LogInformation("Retrieved {Count} builds", _builds.Count);
+
+            _releaseStages = await AzureDevOpsService.GetReleaseStagesAsync();
+            Logger.LogInformation("Retrieved {Count} release stages", _releaseStages.Count);
+
+            _pullRequestsByStatus = _pullRequests
+                .GroupBy(pr => pr.Status)
+                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .ToList();
+
+            _buildsByStatus = _builds
+                .GroupBy(b => b.Status)
+                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .ToList();
+
+            Logger.LogInformation("Data refresh completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error refreshing data");
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}
