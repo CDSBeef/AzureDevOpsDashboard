@@ -128,7 +128,10 @@
                             {
                                 <div style="height: 300px">
                                     <RadzenChart>
-                                        <RadzenBarSeries Data="@_releaseStages" CategoryProperty="Name" ValueProperty="DeploymentsCount" />
+                                        <RadzenColumnSeries Data="@_releaseStagesByStatus" 
+                                                            CategoryProperty="Category" 
+                                                            ValueProperty="Count"
+                                                            Title="Release Stages" />
                                     </RadzenChart>
                                 </div>
                                 <div class="list mt-3">
@@ -136,11 +139,14 @@
                                     {
                                         <div class="item">
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <span class="fw-bold">@stage.Name</span>
-                                                <span class="badge bg-info">@stage.DeploymentsCount deployments</span>
+                                                <span class="fw-bold">@stage.ReleaseName - @stage.StageName</span>
+                                                <span class="badge bg-info">@stage.Status</span>
                                             </div>
                                             <div class="text-muted small">
-                                                Status: @stage.Status
+                                                @if (stage.LastReleaseDate.HasValue)
+                                                {
+                                                    <span>Last Release: @stage.LastReleaseDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                                }
                                             </div>
                                         </div>
                                     }
@@ -171,6 +177,7 @@
     private List<ReleaseStage> _releaseStages = new();
     private List<ChartData> _pullRequestsByStatus = new();
     private List<ChartData> _buildsByStatus = new();
+    private List<ChartData> _releaseStagesByStatus = new();
     private bool _loading = false;
     private string? _error;
     private bool _tokenVerified = false;
@@ -276,6 +283,12 @@
 
             _buildsByStatus = _builds
                 .GroupBy(b => b.Status)
+                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .ToList();
+
+            // Group release stages by status for the chart
+            _releaseStagesByStatus = _releaseStages
+                .GroupBy(r => r.Status)
                 .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
                 .ToList();
 

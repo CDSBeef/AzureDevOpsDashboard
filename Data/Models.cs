@@ -20,8 +20,9 @@ namespace AzureDevOpsDashboard.Data
 
     public class ReleaseStage
     {
-        public string Name { get; set; }
+        public string ReleaseName { get; set; }
+        public string StageName { get; set; }
         public string Status { get; set; }
-        public int DeploymentsCount { get; set; }
+        public DateTime? LastReleaseDate { get; set; }
     }
 }

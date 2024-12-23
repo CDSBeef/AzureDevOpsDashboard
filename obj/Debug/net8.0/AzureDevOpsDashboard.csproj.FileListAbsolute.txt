@@ -33,3 +33,4 @@ C:\GG\AzureDevOpsDashboard\obj\Debug\net8.0\refint\AzureDevOpsDashboard.dll
 C:\GG\AzureDevOpsDashboard\obj\Debug\net8.0\AzureDevOpsDashboard.pdb
 C:\GG\AzureDevOpsDashboard\obj\Debug\net8.0\AzureDevOpsDashboard.genruntimeconfig.cache
 C:\GG\AzureDevOpsDashboard\obj\Debug\net8.0\ref\AzureDevOpsDashboard.dll
+C:\GG\AzureDevOpsDashboard\obj\Debug\net8.0\AzureDevOpsDashboard.sourcelink.json

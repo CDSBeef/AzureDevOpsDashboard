@@ -204,52 +204,63 @@ namespace AzureDevOpsDashboard.Services
                 var organization = _configuration["AzureDevOps:Organization"];
                 var project = _configuration["AzureDevOps:Project"];
 
-                if (string.IsNullOrEmpty(organization) || string.IsNullOrEmpty(project))
-                {
-                    _logger.LogError("Organization or Project configuration is missing");
-                    throw new Exception("Organization or Project configuration is missing");
-                }
-
                 _logger.LogInformation("Fetching Releases for org: {Organization}, project: {Project}", organization, project);
 
-                // Updated Release API URL format and version
-                var url = $"https://vsrm.dev.azure.com/{organization}/{project}/_apis/release/definitions?api-version=6.0";
-                _logger.LogInformation("Requesting URL: {Url}", url);
-                _logger.LogInformation("Fetching releases from URL: {Url}", url);
-
-                var response = await _httpClient.GetAsync(url);
-                _logger.LogInformation("Build/Release response status: {StatusCode}", response.StatusCode);
-                string contentPreview = (await response.Content.ReadAsStringAsync())[..Math.Min(200, (await response.Content.ReadAsStringAsync()).Length)];
-                _logger.LogInformation("Build/Release content preview (first 200 chars): {Preview}", contentPreview);
-
-                var content = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation("Release Response: {Response}", content);
-
-                response.EnsureSuccessStatusCode();
+                // Get release definition
+                var definitionsUrl = $"https://vsrm.dev.azure.com/{organization}/{project}/_apis/release/definitions?api-version=6.0&$expand=environments";
+                _logger.LogInformation("Requesting definitions URL: {Url}", definitionsUrl);
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                var definitionsResponse = await _httpClient.GetAsync(definitionsUrl);
+                var definitionsContent = await definitionsResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation("Definitions Response: {Response}", definitionsContent);
+                
+                definitionsResponse.EnsureSuccessStatusCode();
+                
                 var stages = new List<ReleaseStage>();
+                var definitions = JsonSerializer.Deserialize<JsonElement>(definitionsContent);
 
-                if (result.TryGetProperty("value", out JsonElement valueElement))
+                if (definitions.TryGetProperty("value", out JsonElement definitionValues))
                 {
-                    foreach (var release in valueElement.EnumerateArray())
+                    foreach (var definition in definitionValues.EnumerateArray())
                     {
-                        if (release.TryGetProperty("environments", out JsonElement environments))
+                        var releaseName = definition.GetProperty("name").GetString();
+                        var definitionId = definition.GetProperty("id").GetInt32();
+
+                        // Get the latest release for this definition
+                        var releasesUrl = $"https://vsrm.dev.azure.com/{organization}/{project}/_apis/release/releases?definitionId={definitionId}&$top=1&$expand=environments&api-version=6.0";
+                        _logger.LogInformation("Fetching latest release from URL: {Url}", releasesUrl);
+                        
+                        var releasesResponse = await _httpClient.GetAsync(releasesUrl);
+                        var releasesContent = await releasesResponse.Content.ReadAsStringAsync();
+                        _logger.LogInformation("Latest release Response: {Response}", releasesContent);
+
+                        if (releasesResponse.IsSuccessStatusCode)
                         {
-                            foreach (var stage in environments.EnumerateArray())
+                            var releaseData = JsonSerializer.Deserialize<JsonElement>(releasesContent);
+                            if (releaseData.TryGetProperty("value", out JsonElement releases) && releases.GetArrayLength() > 0)
                             {
-                                try
+                                var latestRelease = releases[0];
+                                if (latestRelease.TryGetProperty("environments", out JsonElement environments))
                                 {
-                                    stages.Add(new ReleaseStage
+                                    foreach (var env in environments.EnumerateArray())
                                     {
-                                        Name = stage.GetProperty("name").GetString(),
-                                        Status = stage.GetProperty("status").GetString(),
-                                        DeploymentsCount = stage.GetProperty("deploymentCount").GetInt32()
-                                    });
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error processing release stage JSON: {StageJson}", JsonSerializer.Serialize(stage));
+                                        try
+                                        {
+                                            stages.Add(new ReleaseStage
+                                            {
+                                                ReleaseName = releaseName,
+                                                StageName = env.GetProperty("name").GetString(),
+                                                Status = env.GetProperty("status").GetString(),
+                                                LastReleaseDate = env.TryGetProperty("startedOn", out JsonElement date) 
+                                                    ? date.GetDateTime() 
+                                                    : null
+                                            });
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            _logger.LogError(ex, "Error processing environment: {EnvJson}", JsonSerializer.Serialize(env));
+                                        }
+                                    }
                                 }
                             }
                         }
