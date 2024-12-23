@@ -18,11 +18,20 @@ namespace AzureDevOpsDashboard.Data
         public DateTime FinishTime { get; set; }
     }
 
+    public class Release
+    {
+        public string Name { get; set; }
+        public string DefinitionName { get; set; }
+        public DateTime? CreatedOn { get; set; }
+        public List<ReleaseStage> Stages { get; set; } = new();
+    }
+
     public class ReleaseStage
     {
+        public string Name { get; set; }
+        public string Status { get; set; }
+        public DateTime? LastReleaseDate { get; set; }  // Changed from LastUpdatedOn
         public string ReleaseName { get; set; }
         public string StageName { get; set; }
-        public string Status { get; set; }
-        public DateTime? LastReleaseDate { get; set; }
     }
 }

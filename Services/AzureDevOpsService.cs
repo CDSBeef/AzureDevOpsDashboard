@@ -250,8 +250,9 @@ namespace AzureDevOpsDashboard.Services
                                             {
                                                 ReleaseName = releaseName,
                                                 StageName = env.GetProperty("name").GetString(),
+                                                Name = env.GetProperty("name").GetString(),
                                                 Status = env.GetProperty("status").GetString(),
-                                                LastReleaseDate = env.TryGetProperty("startedOn", out JsonElement date) 
+                                                LastReleaseDate = env.TryGetProperty("lastModifiedOn", out JsonElement date) 
                                                     ? date.GetDateTime() 
                                                     : null
                                             });
@@ -273,6 +274,69 @@ namespace AzureDevOpsDashboard.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to get release stages");
+                throw;
+            }
+        }
+
+        public async Task<List<Release>> GetReleasesAsync()
+        {
+            try
+            {
+                await SetupHttpClientAsync();
+                var organization = _configuration["AzureDevOps:Organization"];
+                var project = _configuration["AzureDevOps:Project"];
+
+                _logger.LogInformation("Fetching Releases for org: {Organization}, project: {Project}", organization, project);
+
+                // Get all releases
+                var releasesUrl = $"https://vsrm.dev.azure.com/{organization}/{project}/_apis/release/releases?$expand=environments&api-version=6.0";
+                _logger.LogInformation("Requesting releases URL: {Url}", releasesUrl);
+                
+                var releasesResponse = await _httpClient.GetAsync(releasesUrl);
+                var releasesContent = await releasesResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation("Releases Response: {Response}", releasesContent);
+                
+                releasesResponse.EnsureSuccessStatusCode();
+                
+                var releases = new List<Release>();
+                var releasesData = JsonSerializer.Deserialize<JsonElement>(releasesContent);
+
+                if (releasesData.TryGetProperty("value", out JsonElement releaseValues))
+                {
+                    foreach (var releaseValue in releaseValues.EnumerateArray())
+                    {
+                        var release = new Release
+                        {
+                            Name = releaseValue.GetProperty("name").GetString(),
+                            DefinitionName = releaseValue.GetProperty("releaseDefinition").GetProperty("name").GetString(),
+                            CreatedOn = releaseValue.GetProperty("createdOn").GetDateTime()
+                        };
+
+                        if (releaseValue.TryGetProperty("environments", out JsonElement environments))
+                        {
+                            foreach (var env in environments.EnumerateArray())
+                            {
+                                release.Stages.Add(new ReleaseStage
+                                {
+                                    Name = env.GetProperty("name").GetString(),
+                                    Status = env.GetProperty("status").GetString(),
+                                    LastReleaseDate = env.TryGetProperty("lastModifiedOn", out JsonElement date) 
+                                        ? date.GetDateTime() 
+                                        : null
+                                });
+                            }
+                        }
+
+                        releases.Add(release);
+                    }
+                }
+
+                _logger.LogInformation("Retrieved {Count} releases", releases.Count);
+                return releases;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get releases");
                 throw;
             }
         }

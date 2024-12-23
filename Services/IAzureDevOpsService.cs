@@ -8,6 +8,7 @@ namespace AzureDevOpsDashboard.Services
     {
         Task<List<PullRequest>> GetPullRequestsAsync();
         Task<List<BuildInfo>> GetBuildsAsync();
-        Task<List<ReleaseStage>> GetReleaseStagesAsync();
+        Task<List<ReleaseStage>> GetReleaseStagesAsync();  // Make sure this exact signature exists
+        Task<List<Release>> GetReleasesAsync();
     }
 }
