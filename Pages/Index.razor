@@ -9,18 +9,30 @@
 <PageTitle>Azure DevOps Dashboard</PageTitle>
 
 <div class="container">
-    <div class="token-input @(_tokenVerified ? "d-none" : "")">
-        <input type="password" 
-               @bind="_token" 
-               @bind:event="oninput"
-               placeholder="Enter Azure DevOps PAT Token" />
-        <button class="btn btn-primary" @onclick="SetToken">Set Token</button>
-    </div>
-    @if (!string.IsNullOrEmpty(_error))
+    @if (!_tokenVerified)
     {
-        <div class="alert alert-danger mt-3">@_error</div>
+        <div class="token-input-container">
+            <div class="token-input-card">
+                <h1 class="token-input-title">Azure DevOps Dashboard</h1>
+                <div class="token-input">
+                    <input type="password" 
+                           @bind="_token" 
+                           @bind:event="oninput"
+                           placeholder="Enter your PAT token" />
+                </div>
+                <button class="token-button" 
+                        @onclick="SetToken"
+                        disabled="@(string.IsNullOrWhiteSpace(_token))">
+                    Set Token
+                </button>
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="alert alert-danger">@_error</div>
+                }
+            </div>
+        </div>
     }
-
+    
     @if (_tokenVerified)
     {
         @if (_loading)

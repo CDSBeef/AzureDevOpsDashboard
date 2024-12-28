@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AzureDevOpsDashboard")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+20fee116897badaf7509ed93e3891fb7e1acc84a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3342557e42f8a56442c02488aebddd088222db46")]
 [assembly: System.Reflection.AssemblyProductAttribute("AzureDevOpsDashboard")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AzureDevOpsDashboard")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
