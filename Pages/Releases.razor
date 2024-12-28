@@ -1,0 +1,94 @@
+@page "/releases"
+@using AzureDevOpsDashboard.Services
+@using AzureDevOpsDashboard.Data
+@inject IAzureDevOpsService AzureDevOpsService
+@inject ITokenService TokenService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Releases - Azure DevOps Dashboard</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">
+        <h4>Error</h4>
+        <p>@_error</p>
+    </div>
+}
+else
+{
+    <div class="section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Releases (@_releases.Count)</h2>
+            </div>
+            <div class="card-body">
+                @if (_releases.Any())
+                {
+                    <div class="list mt-3">
+                        @foreach (var release in _releases)
+                        {
+                            <div class="release-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-1">@release.Name</h5>
+                                    <small>@release.CreatedOn?.ToString("MMM dd, yyyy HH:mm")</small>
+                                </div>
+                                <div class="text-muted mb-2">Definition: @release.DefinitionName</div>
+                                <div class="stages-list">
+                                    @foreach (var stage in release.Stages)
+                                    {
+                                        <span class="badge bg-secondary me-2">
+                                            @stage.Name: @stage.Status
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        No releases found
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Release> _releases = new();
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenService.GetTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        try
+        {
+            _releases = await AzureDevOpsService.GetReleasesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

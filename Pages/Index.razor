@@ -5,6 +5,8 @@
 @inject ITokenService TokenService
 @inject IConfiguration Configuration
 @inject ILogger<Index> Logger
+@inject NavigationManager NavigationManager
+@inject TokenStateService TokenStateService
 
 <PageTitle>Azure DevOps Dashboard</PageTitle>
 
@@ -240,8 +242,6 @@
         public int Count { get; set; }
     }
 
-    // Remove or comment out OnInitializedAsync entirely:
-    /*
     protected override async Task OnInitializedAsync()
     {
         try
@@ -251,6 +251,7 @@
             if (!string.IsNullOrEmpty(token))
             {
                 _token = token;
+                _tokenVerified = true;
                 Logger.LogInformation("Token retrieved successfully during initialization");
                 await RefreshData();
             }
@@ -265,7 +266,6 @@
             _error = ex.Message;
         }
     }
-    */
 
     private async Task SetToken()
     {
@@ -291,6 +291,10 @@
 
             _tokenVerified = true;
             await RefreshData();
+            
+            // Notify that token has been set
+            TokenStateService.NotifyTokenSet();
+            StateHasChanged();
         }
         catch (Exception ex)
         {

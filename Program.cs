@@ -19,6 +19,7 @@ builder.Services.AddSingleton<ITokenService>(serviceProvider =>
     return tokenService;
 });
 builder.Services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
+builder.Services.AddSingleton<TokenStateService>();
 
 // Add Radzen services
 builder.Services.AddScoped<DialogService>();

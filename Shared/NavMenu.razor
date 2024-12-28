@@ -1,4 +1,9 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@using AzureDevOpsDashboard.Services
+@inject ITokenService TokenService
+@inject TokenStateService TokenStateService
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">
             <span class="oi oi-dashboard" aria-hidden="true"></span>
@@ -17,16 +22,61 @@
                 <span class="oi oi-home" aria-hidden="true"></span> Dashboard
             </NavLink>
         </div>
+        @if (_hasToken)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="releases">
+                    <span class="oi oi-box" aria-hidden="true"></span> Releases
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
+    private bool _hasToken;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenService.GetTokenAsync();
+        _hasToken = !string.IsNullOrEmpty(token);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var token = await TokenService.GetTokenAsync();
+        _hasToken = !string.IsNullOrEmpty(token);
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        TokenStateService.OnTokenSet += async () =>
+        {
+            await InvokeAsync(async () =>
+            {
+                var token = await TokenService.GetTokenAsync();
+                _hasToken = !string.IsNullOrEmpty(token);
+                StateHasChanged();
+            });
+        };
+    }
+
+    public void Dispose()
+    {
+        TokenStateService.OnTokenSet -= async () => await InvokeAsync(async () =>
+        {
+            var token = await TokenService.GetTokenAsync();
+            _hasToken = !string.IsNullOrEmpty(token);
+            StateHasChanged();
+        });
     }
 }
