@@ -13,24 +13,46 @@
 <div class="container">
     @if (!_tokenVerified)
     {
+        <div class="animated-background">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+            <div class="shape shape-square shape-square-1"></div>
+            <div class="shape shape-square shape-square-2"></div>
+            <div class="shape shape-triangle shape-triangle-1"></div>
+        </div>
+        
         <div class="token-input-container">
             <div class="token-input-card">
-                <h1 class="token-input-title">Azure DevOps Dashboard</h1>
+                <div class="token-input-logo">
+                    <span class="oi oi-lock-locked"></span>
+                </div>
+                <h1 class="token-input-title">Welcome Back</h1>
+                <p class="token-input-subtitle">Enter your Azure DevOps token to continue</p>
+                
                 <div class="token-input">
                     <input type="password" 
                            @bind="_token" 
                            @bind:event="oninput"
-                           placeholder="Enter your PAT token" />
+                           placeholder="Enter your PAT token"
+                           @onkeypress="@(e => e.Key == "Enter" ? SetToken() : null)" />
                 </div>
+                
                 <button class="token-button" 
                         @onclick="SetToken"
                         disabled="@(string.IsNullOrWhiteSpace(_token))">
-                    Set Token
+                    <span class="oi oi-account-login mr-2"></span>
+                    Connect to Azure DevOps
                 </button>
+    
                 @if (!string.IsNullOrEmpty(_error))
                 {
-                    <div class="alert alert-danger">@_error</div>
+                    <div class="alert alert-danger mt-3">@_error</div>
                 }
+    
+                <div class="token-help">
+                    Need help? <a href="https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate" target="_blank">Learn how to create a PAT token</a>
+                </div>
             </div>
         </div>
     }
@@ -265,7 +287,8 @@
             }
             else
             {
-                Logger.LogWarning("Token is empty during initialization");
+                Logger.LogInformation("No token found during initialization - waiting for user input"); // Changed from LogWarning to LogInformation
+                _tokenVerified = false;
             }
         }
         catch (Exception ex)
@@ -294,21 +317,19 @@
             
             if (string.IsNullOrEmpty(verifiedToken))
             {
-                throw new Exception("Token verification failed");
+                ResetTokenState("Token verification failed");
+                return;
             }
 
             _tokenVerified = true;
             await RefreshData();
             
-            // Notify that token has been set
             TokenStateService.NotifyTokenSet();
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            _error = $"Failed to set token: {ex.Message}";
-            _tokenVerified = false;
-            _token = string.Empty;
+            ResetTokenState($"Failed to set token: {ex.Message}");
         }
         finally
         {
@@ -321,7 +342,7 @@
     {
         if (!_tokenVerified)
         {
-            _error = "Please set a valid token first";
+            ResetTokenState("Please set a valid token first");
             return;
         }
 
@@ -331,16 +352,23 @@
             _error = null;
             Logger.LogInformation("Refreshing dashboard data with verified token");
 
-            _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
+            // Attempt to get data - if any request fails with 401, reset token
+            try
+            {
+                _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
+                _builds = await AzureDevOpsService.GetBuildsAsync();
+                _releaseStages = await AzureDevOpsService.GetReleaseStagesAsync();
+                _releases = await AzureDevOpsService.GetReleasesAsync();
+            }
+            catch (HttpRequestException ex) when (ex.Message.Contains("401"))
+            {
+                ResetTokenState("Token is invalid or expired. Please enter a valid token.");
+                return;
+            }
+
             Logger.LogInformation("Retrieved {Count} pull requests", _pullRequests.Count);
-
-            _builds = await AzureDevOpsService.GetBuildsAsync();
             Logger.LogInformation("Retrieved {Count} builds", _builds.Count);
-
-            _releaseStages = await AzureDevOpsService.GetReleaseStagesAsync();
             Logger.LogInformation("Retrieved {Count} release stages", _releaseStages.Count);
-
-            _releases = await AzureDevOpsService.GetReleasesAsync();
             Logger.LogInformation("Retrieved {Count} releases", _releases.Count);
 
             _pullRequestsByStatus = _pullRequests
@@ -365,12 +393,27 @@
         {
             Logger.LogError(ex, "Error refreshing data");
             _error = ex.Message;
+            
+            // If we get any authorization errors, reset the token state
+            if (ex.Message.Contains("Unauthorized") || ex.Message.Contains("401"))
+            {
+                ResetTokenState("Token is invalid or expired. Please enter a valid token.");
+            }
         }
         finally
         {
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private void ResetTokenState(string errorMessage)
+    {
+        _error = errorMessage;
+        _tokenVerified = false;
+        _token = string.Empty;
+        TokenService.ClearTokenAsync().ConfigureAwait(false);
+        TokenStateService.NotifyTokenCleared();
     }
 
     private string GetBranchName(string refName)

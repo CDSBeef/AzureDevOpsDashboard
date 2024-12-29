@@ -6,6 +6,9 @@ using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add URL configuration
+builder.WebHost.UseUrls("https://localhost:7234", "http://localhost:5234");
+
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
@@ -29,6 +32,12 @@ builder.Services.AddScoped<ContextMenuService>();
 
 // Add HttpClient
 builder.Services.AddHttpClient();
+
+// Configure HTTPS redirection
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = 5001;
+});
 
 // Configure logging
 builder.Logging.ClearProviders();

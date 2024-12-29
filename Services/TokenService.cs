@@ -8,6 +8,8 @@ namespace AzureDevOpsDashboard.Services
         private readonly object _lock = new object();
         private readonly ILogger<TokenService> _logger;
 
+        public event EventHandler? TokenCleared;
+
         public TokenService(ILogger<TokenService> logger)
         {
             _logger = logger;
@@ -37,6 +39,17 @@ namespace AzureDevOpsDashboard.Services
                 
                 _token = token;
                 _logger.LogInformation("Token stored successfully. Stored token length: {Length}", _token.Length);
+                return Task.CompletedTask;
+            }
+        }
+
+        public Task ClearTokenAsync()
+        {
+            lock (_lock)
+            {
+                _token = null;
+                _logger.LogInformation("Token cleared");
+                TokenCleared?.Invoke(this, EventArgs.Empty);
                 return Task.CompletedTask;
             }
         }
