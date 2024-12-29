@@ -93,6 +93,7 @@ namespace AzureDevOpsDashboard.Services
                     foreach (var repo in repos.EnumerateArray())
                     {
                         var repoId = repo.GetProperty("id").GetString();
+                        var repoName = repo.GetProperty("name").GetString();
                         var prUrl = $"https://dev.azure.com/{organization}/{project}/_apis/git/repositories/{repoId}/pullrequests?searchCriteria.status=active&api-version=7.0";
                         _logger.LogInformation("Requesting URL: {Url}", prUrl);
                         _logger.LogInformation("Fetching PRs from URL: {Url}", prUrl);
@@ -115,8 +116,34 @@ namespace AzureDevOpsDashboard.Services
                         {
                             foreach (var pr in prArray.EnumerateArray())
                             {
-                                var pullRequest = JsonSerializer.Deserialize<PullRequest>(pr.GetRawText());
-                                prs.Add(pullRequest);
+                                try
+                                {
+                                    var rawJson = pr.GetRawText();
+                                    _logger.LogInformation("Processing PR JSON: {Json}", rawJson);
+                                    
+                                    var options = new JsonSerializerOptions
+                                    {
+                                        PropertyNameCaseInsensitive = true
+                                    };
+                                    
+                                    var pullRequest = JsonSerializer.Deserialize<PullRequest>(rawJson, options);
+                                    if (pullRequest != null)
+                                    {
+                                        // Format the URL
+                                        pullRequest.FormattedUrl = $"https://dev.azure.com/{organization}/{project}/_git/{repoName}/pullrequest/{pullRequest.Id}";
+                                        // Format the Repo URL
+                                        pullRequest.FormattedRepoUrl = $"https://dev.azure.com/{organization}/{project}/_git/{repoName}";
+                                        prs.Add(pullRequest);
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("Failed to deserialize PR: {Json}", rawJson);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error processing PR JSON: {Json}", pr.GetRawText());
+                                }
                             }
                         }
                     }

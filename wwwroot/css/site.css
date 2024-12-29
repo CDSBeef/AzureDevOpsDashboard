@@ -58,6 +58,17 @@
     border-bottom: none;
 }
 
+.item a {
+    color: #0078d4;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.item a:hover {
+    color: #0086ef;
+    text-decoration: underline;
+}
+
 /* Dark theme styles */
 body {
     background-color: #1a1a1a;

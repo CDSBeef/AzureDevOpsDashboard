@@ -74,11 +74,19 @@
                                     {
                                         <div class="item">
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <span class="fw-bold">@pr.Title</span>
+                                                <span class="fw-bold">
+                                                    <a href="@pr.FormattedUrl" target="_blank">@pr.Title</a>
+                                                </span>
                                                 <span class="badge bg-primary">@pr.Status</span>
                                             </div>
                                             <div class="text-muted small">
-                                                Created by @pr.CreatedBy on @pr.CreatedDate.ToString("MMM dd, yyyy")
+                                                Created by @(pr.CreatedBy?.DisplayName ?? "Unknown") on @pr.CreationDate.ToString("MMM dd, yyyy")
+                                            </div>
+                                            <div class="text-muted small">
+                                                Repository: <a href="@pr.FormattedRepoUrl" target="_blank">@(pr.Repository?.Name ?? "Unknown")</a>
+                                            </div>
+                                            <div class="text-muted small">
+                                                @(GetBranchName(pr.SourceRefName ?? "")) → @(GetBranchName(pr.TargetRefName ?? ""))
                                             </div>
                                         </div>
                                     }
@@ -363,5 +371,12 @@
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private string GetBranchName(string refName)
+    {
+        if (string.IsNullOrEmpty(refName))
+            return "Unknown";
+        return refName.Replace("refs/heads/", "");
     }
 }
