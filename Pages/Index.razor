@@ -116,7 +116,7 @@
                                                 <span class="badge @(build.Status == "succeeded" ? "bg-success" : "bg-danger")">@build.Status</span>
                                             </div>
                                             <div class="text-muted small">
-                                                Started: @build.StartTime.ToString("MMM dd, yyyy HH:mm")
+                                                Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")
                                             </div>
                                         </div>
                                     }

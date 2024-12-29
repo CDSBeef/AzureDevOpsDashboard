@@ -1,0 +1,103 @@
+@page "/releasestages"
+@using AzureDevOpsDashboard.Services
+@using AzureDevOpsDashboard.Data
+@inject IAzureDevOpsService AzureDevOpsService
+@inject ITokenService TokenService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Release Stages - Azure DevOps Dashboard</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">
+        <h4>Error</h4>
+        <p>@_error</p>
+    </div>
+}
+else
+{
+    <div class="section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Release Stages (@_stages.Count)</h2>
+            </div>
+            <div class="card-body">
+                @if (_stagesByStatus.Any())
+                {
+                    <div style="height: 300px">
+                        <RadzenChart>
+                            <RadzenPieSeries Data="@_stagesByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                        </RadzenChart>
+                    </div>
+                    <div class="list mt-3">
+                        @foreach (var stage in _stages)
+                        {
+                            <div class="stage-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-1">@stage.Name</h5>
+                                    <span class="badge bg-secondary">@stage.Status</span>
+                                </div>
+                                <div class="text-muted">Release: @stage.ReleaseName</div>
+                                <small>Updated: @stage.LastReleaseDate?.ToString("MMM dd, yyyy HH:mm")</small>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        No release stages found
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ReleaseStage> _stages = new();
+    private List<ChartData> _stagesByStatus = new();
+    private bool _loading = true;
+    private string? _error;
+
+    private class ChartData
+    {
+        public required string Category { get; set; }
+        public int Count { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenService.GetTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        try
+        {
+            _stages = await AzureDevOpsService.GetReleaseStagesAsync();
+            _stagesByStatus = _stages
+                .GroupBy(s => s.Status)
+                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

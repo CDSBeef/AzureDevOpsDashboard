@@ -1,0 +1,103 @@
+@page "/builds"
+@using AzureDevOpsDashboard.Services
+@using AzureDevOpsDashboard.Data
+@inject IAzureDevOpsService AzureDevOpsService
+@inject ITokenService TokenService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Builds - Azure DevOps Dashboard</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">
+        <h4>Error</h4>
+        <p>@_error</p>
+    </div>
+}
+else
+{
+    <div class="section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Build Status (@_builds.Count)</h2>
+            </div>
+            <div class="card-body">
+                @if (_buildsByStatus.Any())
+                {
+                    <div style="height: 300px">
+                        <RadzenChart>
+                            <RadzenPieSeries Data="@_buildsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                        </RadzenChart>
+                    </div>
+                    <div class="list mt-3">
+                        @foreach (var build in _builds)
+                        {
+                            <div class="build-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-1">@build.Id</h5>
+                                    <span class="badge bg-secondary">@build.Status</span>
+                                </div>
+                                <div class="text-muted">Pipeline: @build.Definition</div>
+                                <small>Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")</small>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        No builds found
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<BuildInfo> _builds = new();
+    private List<ChartData> _buildsByStatus = new();
+    private bool _loading = true;
+    private string? _error;
+
+    private class ChartData
+    {
+        public required string Category { get; set; }
+        public int Count { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenService.GetTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        try
+        {
+            _builds = await AzureDevOpsService.GetBuildsAsync();
+            _buildsByStatus = _builds
+                .GroupBy(b => b.Status)
+                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,104 @@
+@page "/pullrequests"
+@using AzureDevOpsDashboard.Services
+@using AzureDevOpsDashboard.Data
+@inject IAzureDevOpsService AzureDevOpsService
+@inject ITokenService TokenService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Pull Requests - Azure DevOps Dashboard</PageTitle>
+
+<div class="section">
+    @if (_loading)
+    {
+        <div class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger">
+            <h4>Error</h4>
+            <p>@_error</p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Pull Requests (@_pullRequests.Count)</h2>
+            </div>
+            <div class="card-body">
+                @if (_pullRequestsByStatus.Any())
+                {
+                    <div style="height: 300px">
+                        <RadzenChart>
+                            <RadzenPieSeries Data="@_pullRequestsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                        </RadzenChart>
+                    </div>
+                    <div class="list mt-3">
+                        @foreach (var pr in _pullRequests)
+                        {
+                            <div class="item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">@pr.Title</span>
+                                    <span class="badge bg-primary">@pr.Status</span>
+                                </div>
+                                <div class="text-muted small">
+                                    Created by @pr.CreatedBy on @pr.CreatedDate.ToString("MMM dd, yyyy")
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        No pull requests found
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PullRequest> _pullRequests = new();
+    private List<ChartData> _pullRequestsByStatus = new();
+    private bool _loading = true;
+    private string? _error;
+
+    private class ChartData
+    {
+        public required string Category { get; set; }
+        public int Count { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenService.GetTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        try
+        {
+            _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
+            _pullRequestsByStatus = _pullRequests
+                .GroupBy(pr => pr.Status)
+                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
