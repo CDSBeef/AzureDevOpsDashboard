@@ -3,61 +3,37 @@
 @inject TokenStateService TokenStateService
 @implements IDisposable
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">
-            <span class="oi oi-dashboard" aria-hidden="true"></span>
-            Azure DevOps
-        </a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+<nav class="top-nav">
+    <div class="nav-group">
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            Overview
+        </NavLink>
     </div>
-</div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-home" aria-hidden="true"></span> Dashboard
+    @if (_hasToken)
+    {
+        <div class="nav-group">
+            <NavLink class="nav-link" href="pullrequests">
+                Pull Requests
+            </NavLink>
+
+            <NavLink class="nav-link" href="builds">
+                Builds
+            </NavLink>
+
+            <NavLink class="nav-link" href="releasestages">
+                Release Stages
+            </NavLink>
+
+            <NavLink class="nav-link" href="releases">
+                Releases
             </NavLink>
         </div>
-        @if (_hasToken)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="pullrequests">
-                    <span class="oi oi-fork" aria-hidden="true"></span> Pull Requests
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="builds">
-                    <span class="oi oi-cog" aria-hidden="true"></span> Build Status
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="releasestages">
-                    <span class="oi oi-badge" aria-hidden="true"></span> Release Stages
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="releases">
-                    <span class="oi oi-box" aria-hidden="true"></span> Releases
-                </NavLink>
-            </div>
-        }
-    </nav>
-</div>
+    }
+</nav>
 
 @code {
-    private bool collapseNavMenu = true;
     private bool _hasToken;
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
 
     protected override async Task OnInitializedAsync()
     {

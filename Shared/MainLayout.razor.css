@@ -2,73 +2,79 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    height: 100vh;
 }
 
-main {
-    flex: 1;
-    background-color: var(--background-color);
-}
-
-.sidebar {
-    background-color: var(--card-background);
-    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
-}
-
-.top-row {
-    background-color: var(--card-background);
-    border-bottom: 1px solid var(--border-color);
-    justify-content: flex-end;
-    height: 3.5rem;
+.top-bar {
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
     display: flex;
     align-items: center;
+    padding: 0 20px;
+    height: 48px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
 }
 
-.top-row ::deep a, .top-row .btn-link {
-    color: var(--text-secondary);
-    text-decoration: none;
-    margin-left: 1.5rem;
-    transition: color 0.3s ease;
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #333;
+    margin-right: 20px;
+}
+
+.logo {
+    height: 24px;
+    width: auto;
+}
+
+.top-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.search {
+    position: relative;
+}
+
+.search input {
+    padding: 6px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    width: 200px;
     font-size: 14px;
 }
 
-.top-row ::deep a:hover, .top-row .btn-link:hover {
-    color: var(--primary-color);
+.portal-link {
+    color: #666;
+    text-decoration: none;
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
 }
 
-@media (max-width: 640.98px) {
-    .top-row:not(.auth) {
-        display: none;
-    }
-
-    .top-row.auth {
-        justify-content: space-between;
-    }
-
-    .top-row a, .top-row .btn-link {
-        margin-left: 0;
-    }
+.portal-link:hover {
+    background-color: #f5f5f5;
+    color: #333;
 }
 
-@media (min-width: 641px) {
-    .page {
-        flex-direction: row;
-    }
+main {
+    margin-top: 48px;
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
 
-    .sidebar {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
-
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
+.content {
+    max-width: 1400px;
+    margin: 0 auto;
 }

@@ -3,23 +3,26 @@
 <PageTitle>Azure DevOps Dashboard</PageTitle>
 
 <div class="page">
-    <div class="sidebar">
+    <div class="top-bar">
+        <div class="brand">
+            <span class="oi oi-code" aria-hidden="true"></span>
+            Azure DevOps
+        </div>
         <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://dev.azure.com" target="_blank">
+        <div class="top-actions">
+            <div class="search">
+                <input type="text" placeholder="Search..." />
+            </div>
+            <a href="https://dev.azure.com" target="_blank" class="portal-link">
                 <span class="oi oi-external-link" aria-hidden="true"></span>
                 Azure DevOps Portal
             </a>
         </div>
+    </div>
 
-        <article class="content px-4">
+    <main>
+        <article class="content">
             @Body
         </article>
     </main>
 </div>
-
-<link href="_content/Radzen.Blazor/css/default-base.css" rel="stylesheet">
-<script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
