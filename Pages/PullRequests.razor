@@ -27,18 +27,34 @@
     {
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Pull Requests (@_pullRequests.Count)</h2>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="card-title">Pull Requests (@GetFilteredPullRequests().Count)</h2>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="repository-filter">
+                            <select class="form-select" @bind="_selectedRepository">
+                                <option value="">All Repositories</option>
+                                @foreach (var repo in _repositories)
+                                {
+                                    <option value="@repo">@repo</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" @onclick="RefreshData">
+                            <span class="oi oi-reload"></span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
-                @if (_pullRequestsByStatus.Any())
+                @if (GetFilteredPullRequests().Any())
                 {
                     <div style="height: 300px">
                         <RadzenChart>
-                            <RadzenPieSeries Data="@_pullRequestsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                            <RadzenPieSeries Data="@GetFilteredStatusChart()" CategoryProperty="Category" ValueProperty="Count" />
                         </RadzenChart>
                     </div>
                     <div class="list mt-3">
-                        @foreach (var pr in _pullRequests)
+                        @foreach (var pr in GetFilteredPullRequests())
                         {
                             <div class="item">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -73,7 +89,8 @@
 
 @code {
     private List<PullRequest> _pullRequests = new();
-    private List<ChartData> _pullRequestsByStatus = new();
+    private HashSet<string> _repositories = new();
+    private string _selectedRepository = "";
     private bool _loading = true;
     private string? _error;
 
@@ -92,13 +109,19 @@
             return;
         }
 
+        await RefreshData();
+    }
+
+    private async Task RefreshData()
+    {
         try
         {
+            _loading = true;
             _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
-            _pullRequestsByStatus = _pullRequests
-                .GroupBy(pr => pr.Status)
-                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
-                .ToList();
+            _repositories = new HashSet<string>(_pullRequests
+                .Where(pr => pr.Repository?.Name != null)
+                .Select(pr => pr.Repository!.Name!)
+                .OrderBy(name => name));
         }
         catch (Exception ex)
         {
@@ -109,7 +132,23 @@
             _loading = false;
         }
     }
-    
+
+    private List<PullRequest> GetFilteredPullRequests()
+    {
+        return _pullRequests
+            .Where(pr => string.IsNullOrEmpty(_selectedRepository) || 
+                        (pr.Repository?.Name == _selectedRepository))
+            .ToList();
+    }
+
+    private List<ChartData> GetFilteredStatusChart()
+    {
+        return GetFilteredPullRequests()
+            .GroupBy(pr => pr.Status)
+            .Select(g => new ChartData { Category = g.Key ?? "Unknown", Count = g.Count() })
+            .ToList();
+    }
+
     private string GetBranchName(string refName)
     {
         if (string.IsNullOrEmpty(refName))

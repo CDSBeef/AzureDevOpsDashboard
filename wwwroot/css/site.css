@@ -353,3 +353,21 @@ a:hover {
         transform: rotate(360deg);
     }
 }
+
+/* Repository filter */
+.repository-filter {
+    min-width: 200px;
+}
+
+.repository-filter .form-select {
+    padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: white;
+}
+
+.repository-filter .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(0, 120, 212, 0.25);
+}
