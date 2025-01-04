@@ -39,8 +39,18 @@
                                 }
                             </select>
                         </div>
-                        <button class="btn btn-secondary" @onclick="RefreshData">
-                            <span class="oi oi-reload"></span>
+                        <button class="btn btn-secondary" @onclick="RefreshData" title="Refresh pull requests">
+                            @if (_loading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-reload"></span>
+                                <span>Refresh</span>
+                            }
                         </button>
                     </div>
                 </div>
@@ -70,7 +80,9 @@
                                     Repository: <a href="@pr.FormattedRepoUrl" target="_blank">@(pr.Repository?.Name ?? "Unknown")</a>
                                 </div>
                                 <div class="text-muted small">
-                                    @(GetBranchName(pr.SourceRefName ?? "")) → @(GetBranchName(pr.TargetRefName ?? ""))
+                                    <a href="@GetBranchUrl(pr, pr.SourceRefName ?? "")" target="_blank">@(GetBranchName(pr.SourceRefName ?? ""))</a>
+                                    → 
+                                    <a href="@GetBranchUrl(pr, pr.TargetRefName ?? "")" target="_blank">@(GetBranchName(pr.TargetRefName ?? ""))</a>
                                 </div>
                             </div>
                         }
@@ -117,6 +129,8 @@
         try
         {
             _loading = true;
+            StateHasChanged();  // Add this to show loading state immediately
+            
             _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
             _repositories = new HashSet<string>(_pullRequests
                 .Where(pr => pr.Repository?.Name != null)
@@ -130,6 +144,7 @@
         finally
         {
             _loading = false;
+            StateHasChanged();
         }
     }
 
@@ -154,5 +169,14 @@
         if (string.IsNullOrEmpty(refName))
             return "Unknown";
         return refName.Replace("refs/heads/", "");
+    }
+
+    private string GetBranchUrl(PullRequest pr, string refName)
+    {
+        if (string.IsNullOrEmpty(refName) || pr.Repository?.Name == null)
+            return "#";
+            
+        var branchName = GetBranchName(refName);
+        return $"{pr.FormattedRepoUrl}?version=GB{branchName}";
     }
 }

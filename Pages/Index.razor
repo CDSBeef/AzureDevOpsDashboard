@@ -316,36 +316,41 @@
         {
             if (string.IsNullOrEmpty(_token))
             {
-                _error = "Token cannot be empty";
+                await InvokeAsync(() => _error = "Token cannot be empty");
                 return;
             }
 
-            _loading = true;
-            _error = null;
+            await InvokeAsync(() => 
+            {
+                _loading = true;
+                _error = null;
+            });
             
             await TokenService.SetTokenAsync(_token);
             var verifiedToken = await TokenService.GetTokenAsync();
             
             if (string.IsNullOrEmpty(verifiedToken))
             {
-                ResetTokenState("Token verification failed");
+                await ResetTokenState("Token verification failed");
                 return;
             }
 
-            _tokenVerified = true;
+            await InvokeAsync(() => _tokenVerified = true);
             await RefreshData();
             
             TokenStateService.NotifyTokenSet();
-            StateHasChanged();
         }
         catch (Exception ex)
         {
-            ResetTokenState($"Failed to set token: {ex.Message}");
+            await ResetTokenState($"Failed to set token: {ex.Message}");
         }
         finally
         {
-            _loading = false;
-            StateHasChanged();
+            await InvokeAsync(() => 
+            {
+                _loading = false;
+                StateHasChanged();
+            });
         }
     }
 
@@ -353,7 +358,7 @@
     {
         if (!_tokenVerified)
         {
-            ResetTokenState("Please set a valid token first");
+            await ResetTokenState("Please set a valid token first");
             return;
         }
 
@@ -373,7 +378,7 @@
             }
             catch (HttpRequestException ex) when (ex.Message.Contains("401"))
             {
-                ResetTokenState("Token is invalid or expired. Please enter a valid token.");
+                await ResetTokenState("Token is invalid or expired. Please enter a valid token.");
                 return;
             }
 
@@ -408,7 +413,7 @@
             // If we get any authorization errors, reset the token state
             if (ex.Message.Contains("Unauthorized") || ex.Message.Contains("401"))
             {
-                ResetTokenState("Token is invalid or expired. Please enter a valid token.");
+                await ResetTokenState("Token is invalid or expired. Please enter a valid token.");
             }
         }
         finally
@@ -418,13 +423,17 @@
         }
     }
 
-    private void ResetTokenState(string errorMessage)
+    private async Task ResetTokenState(string errorMessage)
     {
-        _error = errorMessage;
-        _tokenVerified = false;
-        _token = string.Empty;
-        TokenService.ClearTokenAsync().ConfigureAwait(false);
-        TokenStateService.NotifyTokenCleared();
+        await InvokeAsync(async () => 
+        {
+            _error = errorMessage;
+            _tokenVerified = false;
+            _token = string.Empty;
+            await TokenService.ClearTokenAsync();
+            TokenStateService.NotifyTokenCleared();
+            StateHasChanged();
+        });
     }
 
     private string GetBranchName(string refName)

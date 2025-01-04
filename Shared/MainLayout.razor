@@ -1,4 +1,7 @@
 ﻿@inherits LayoutComponentBase
+@inject ITokenService TokenService
+@inject TokenStateService TokenStateService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Azure DevOps Dashboard</PageTitle>
 
@@ -14,9 +17,16 @@
                 <input type="text" placeholder="Search..." />
             </div>
             <a href="https://dev.azure.com" target="_blank" class="portal-link">
-                <span class="oi oi-external-link" aria-hidden="true"></span>
+                <span class="oi oi-external-link me-2"></span>
                 Azure DevOps Portal
             </a>
+            @if (_hasToken)
+            {
+                <a href="javascript:void(0)" class="portal-link" @onclick="HandleLogout">
+                    <span class="oi oi-account-logout me-2"></span>
+                    Logout
+                </a>
+            }
         </div>
     </div>
 
@@ -26,3 +36,29 @@
         </article>
     </main>
 </div>
+
+@code {
+    private bool _hasToken;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasToken = !string.IsNullOrEmpty(await TokenService.GetTokenAsync());
+        TokenStateService.OnTokenSet += async () => await InvokeAsync(() => 
+        { 
+            _hasToken = true; 
+            StateHasChanged(); 
+        });
+        TokenStateService.OnTokenCleared += async () => await InvokeAsync(() => 
+        { 
+            _hasToken = false; 
+            StateHasChanged(); 
+        });
+    }
+
+    private async Task HandleLogout()
+    {
+        await TokenService.ClearTokenAsync();
+        TokenStateService.NotifyTokenCleared();
+        NavigationManager.NavigateTo("/", true);
+    }
+}
