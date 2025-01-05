@@ -35,7 +35,7 @@
                            @bind="_token" 
                            @bind:event="oninput"
                            placeholder="Enter your PAT token"
-                           @onkeypress="@(e => e.Key == "Enter" ? SetToken() : null)" />
+                           @onkeypress="@(async (e) => await HandleKeyPress(e))" />
                 </div>
                 
                 <button class="token-button" 
@@ -313,6 +313,7 @@
     private bool _loading = false;
     private string? _error;
     private bool _tokenVerified = false;
+    private string _selectedStatus = string.Empty;
 
     private class ChartData
     {
@@ -425,7 +426,7 @@
             Logger.LogInformation("Retrieved {Count} releases", _releases.Count);
 
             _pullRequestsByStatus = _pullRequests
-                .GroupBy(pr => pr.Status)
+                .GroupBy(pr => pr.Status ?? "Unknown")  // Handle null Status
                 .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
                 .ToList();
 
@@ -487,8 +488,12 @@
 
     private string GetBranchUrl(BuildInfo build)
     {
-        var repoName = build.Repository?.Name ?? "";
-        var branch = build.SourceBranch?.Replace("refs/heads/", "");
+        if (build.Repository?.Name == null || string.IsNullOrEmpty(build.SourceBranch) || 
+            string.IsNullOrEmpty(build.Organization) || string.IsNullOrEmpty(build.Project))
+            return "#";
+
+        var repoName = build.Repository.Name;
+        var branch = build.SourceBranch.Replace("refs/heads/", "");
         return $"https://dev.azure.com/{build.Organization}/{build.Project}/_git/{repoName}?version=GB{branch}";
     }
 
@@ -502,5 +507,25 @@
             "canceled" => "bg-warning",
             _ => "bg-secondary"
         };
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SetToken();
+        }
+    }
+
+    private void OnChartClick(SeriesClickEventArgs? args)
+    {
+        var category = args?.Category?.ToString();
+        if (!string.IsNullOrEmpty(category))
+        {
+            _selectedStatus = _selectedStatus.Equals(category, StringComparison.OrdinalIgnoreCase) 
+                ? string.Empty 
+                : category;
+            StateHasChanged();
+        }
     }
 }

@@ -225,27 +225,31 @@ namespace AzureDevOpsDashboard.Services
             var definition = build.GetProperty("definition");
             var repository = build.GetProperty("repository");
 
+            string GetStringOrEmpty(JsonElement element, string propertyName)
+            {
+                return element.TryGetProperty(propertyName, out var prop) ? prop.GetString() ?? string.Empty : string.Empty;
+            }
+
             return new BuildInfo
             {
                 Id = build.GetProperty("id").GetInt32(),
-                BuildNumber = build.GetProperty("buildNumber").GetString(),
-                Definition = build.GetProperty("definition").GetProperty("name").GetString(),
-                Status = build.GetProperty("status").GetString(),
-                Result = build.GetProperty("result").GetString() ?? "in_progress",
+                BuildNumber = GetStringOrEmpty(build, "buildNumber"),
+                Definition = GetStringOrEmpty(definition, "name"),
+                Status = GetStringOrEmpty(build, "status"),
+                Result = GetStringOrEmpty(build, "result") ?? "in_progress",
                 StartTime = build.TryGetProperty("startTime", out var startTime) ? startTime.GetDateTime() : null,
                 FinishTime = build.TryGetProperty("finishTime", out var finishTime) ? finishTime.GetDateTime() : null,
-                RequestedForDisplayName = build.GetProperty("requestedFor").GetProperty("displayName").GetString(),
-                Reason = build.GetProperty("reason").GetString(),
-                SourceBranch = build.GetProperty("sourceBranch").GetString(),
-                FormattedUrl = $"https://dev.azure.com/{_organization}/{project}/_build/results?buildId={build.GetProperty("id").GetInt32()}",
+                RequestedForDisplayName = GetStringOrEmpty(build.GetProperty("requestedFor"), "displayName"),
+                Reason = GetStringOrEmpty(build, "reason"),
+                SourceBranch = GetStringOrEmpty(build, "sourceBranch"),
                 Organization = _organization,
-                Project = project.GetProperty("name").GetString() ?? "",
+                Project = GetStringOrEmpty(project, "name"),
                 DefinitionId = definition.GetProperty("id").GetInt32(),
                 Repository = new Repository 
                 { 
-                    Id = repository.GetProperty("id").GetString() ?? "",
-                    Name = repository.GetProperty("name").GetString() ?? "",
-                    Url = repository.GetProperty("url").GetString() ?? ""
+                    Id = GetStringOrEmpty(repository, "id"),
+                    Name = GetStringOrEmpty(repository, "name"),
+                    Url = GetStringOrEmpty(repository, "url")
                 }
             };
         }
@@ -300,16 +304,7 @@ namespace AzureDevOpsDashboard.Services
                                     {
                                         try
                                         {
-                                            stages.Add(new ReleaseStage
-                                            {
-                                                ReleaseName = releaseName,
-                                                StageName = env.GetProperty("name").GetString(),
-                                                Name = env.GetProperty("name").GetString(),
-                                                Status = env.GetProperty("status").GetString(),
-                                                LastReleaseDate = env.TryGetProperty("lastModifiedOn", out JsonElement date) 
-                                                    ? date.GetDateTime() 
-                                                    : null
-                                            });
+                                            stages.Add(MapReleaseStage(env, releaseName));
                                         }
                                         catch (Exception ex)
                                         {
@@ -359,10 +354,13 @@ namespace AzureDevOpsDashboard.Services
                 {
                     foreach (var releaseValue in releaseValues.EnumerateArray())
                     {
+                        var releaseName = GetStringOrEmpty(releaseValue, "name");
+                        var definitionName = GetStringOrEmpty(releaseValue.GetProperty("releaseDefinition"), "name");
+                        
                         var release = new Release
                         {
-                            Name = releaseValue.GetProperty("name").GetString(),
-                            DefinitionName = releaseValue.GetProperty("releaseDefinition").GetProperty("name").GetString(),
+                            Name = releaseName,
+                            DefinitionName = definitionName,
                             CreatedOn = releaseValue.GetProperty("createdOn").GetDateTime()
                         };
 
@@ -370,14 +368,7 @@ namespace AzureDevOpsDashboard.Services
                         {
                             foreach (var env in environments.EnumerateArray())
                             {
-                                release.Stages.Add(new ReleaseStage
-                                {
-                                    Name = env.GetProperty("name").GetString(),
-                                    Status = env.GetProperty("status").GetString(),
-                                    LastReleaseDate = env.TryGetProperty("lastModifiedOn", out JsonElement date) 
-                                        ? date.GetDateTime() 
-                                        : null
-                                });
+                                release.Stages.Add(MapReleaseStage(env, release.Name));
                             }
                         }
 
@@ -393,6 +384,23 @@ namespace AzureDevOpsDashboard.Services
                 _logger.LogError(ex, "Failed to get releases");
                 throw;
             }
+        }
+
+        private ReleaseStage MapReleaseStage(JsonElement env, string? releaseName)
+        {
+            return new ReleaseStage
+            {
+                Name = GetStringOrEmpty(env, "name"),
+                Status = GetStringOrEmpty(env, "status"),
+                LastReleaseDate = env.TryGetProperty("lastModifiedOn", out var date) ? date.GetDateTime() : null,
+                ReleaseName = releaseName ?? "Unknown",
+                StageName = GetStringOrEmpty(env, "name")
+            };
+        }
+
+        private static string GetStringOrEmpty(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var prop) ? prop.GetString() ?? string.Empty : string.Empty;
         }
     }
 }

@@ -44,8 +44,7 @@ builder.Logging.ClearProviders();
 builder.Logging.SetMinimumLevel(LogLevel.Trace);
 builder.Logging.AddConsole(options =>
 {
-    options.IncludeScopes = true;
-    options.TimestampFormat = "[HH:mm:ss] ";
+    options.FormatterName = "simple";
 });
 builder.Logging.AddDebug();
 

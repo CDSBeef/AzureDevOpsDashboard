@@ -241,9 +241,9 @@ else
 
     private void OnChartClick(SeriesClickEventArgs? args)
     {
-        if (args?.Category is not null)
+        if (args?.Category?.ToString() is { } category)  // Pattern matching ensures non-null
         {
-            _selectedStatus = _selectedStatus == args.Category.ToString() ? "" : args.Category.ToString();
+            _selectedStatus = _selectedStatus.Equals(category) ? string.Empty : category;
             StateHasChanged();
         }
     }
@@ -255,8 +255,12 @@ else
 
     private string GetBranchUrl(BuildInfo build)
     {
-        var repoName = build.Repository?.Name ?? "";
-        var branch = build.SourceBranch?.Replace("refs/heads/", "");
+        if (build.Repository?.Name == null || string.IsNullOrEmpty(build.SourceBranch) || 
+            string.IsNullOrEmpty(build.Organization) || string.IsNullOrEmpty(build.Project))
+            return "#";
+
+        var repoName = build.Repository.Name;
+        var branch = build.SourceBranch.Replace("refs/heads/", "");
         return $"https://dev.azure.com/{build.Organization}/{build.Project}/_git/{repoName}?version=GB{branch}";
     }
 }
