@@ -340,6 +340,80 @@ namespace AzureDevOpsDashboard.Services
             }
         }
 
+        private List<Release> MapReleases(JsonElement releaseValues)
+        {
+            var releases = new List<Release>();
+            foreach (var releaseValue in releaseValues.EnumerateArray())
+            {
+                var release = new Release
+                {
+                    Name = GetStringOrEmpty(releaseValue, "name"),
+                    DefinitionName = GetStringOrEmpty(releaseValue.GetProperty("releaseDefinition"), "name"),
+                    CreatedOn = releaseValue.GetProperty("createdOn").GetDateTime(),
+                    ReleaseId = releaseValue.GetProperty("id").GetInt32(),
+                    DefinitionId = releaseValue.GetProperty("releaseDefinition").GetProperty("id").GetInt32(),
+                    Branch = GetBranchFromRelease(releaseValue)
+                };
+
+                // Add stages mapping
+                if (releaseValue.TryGetProperty("environments", out JsonElement environments))
+                {
+                    foreach (var env in environments.EnumerateArray())
+                    {
+                        release.Stages.Add(MapReleaseStage(env, release.Name));
+                    }
+                }
+
+                releases.Add(release);
+            }
+            return releases;
+        }
+
+        private string GetBranchFromRelease(JsonElement releaseValue)
+        {
+            try
+            {
+                if (releaseValue.TryGetProperty("artifacts", out JsonElement artifacts))
+                {
+                    foreach (var artifact in artifacts.EnumerateArray())
+                    {
+                        if (artifact.TryGetProperty("definitionReference", out JsonElement defRef))
+                        {
+                            // Try to get branch from definitionReference.branch
+                            if (defRef.TryGetProperty("branch", out JsonElement branchInfo))
+                            {
+                                if (branchInfo.TryGetProperty("name", out JsonElement branchName))
+                                {
+                                    var branch = branchName.GetString();
+                                    _logger.LogInformation("Found branch from definitionReference: {Branch}", branch);
+                                    return branch ?? string.Empty;
+                                }
+                            }
+
+                            // Fallback to branches property if branch is not found
+                            if (defRef.TryGetProperty("branches", out JsonElement branches))
+                            {
+                                if (branches.TryGetProperty("name", out JsonElement branchName))
+                                {
+                                    var branch = branchName.GetString();
+                                    _logger.LogInformation("Found branch from branches: {Branch}", branch);
+                                    return branch ?? string.Empty;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                _logger.LogInformation("No branch information found in release artifacts");
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting branch from release");
+                return string.Empty;
+            }
+        }
+
         public async Task<List<Release>> GetReleasesAsync(string project)
         {
             try
@@ -349,8 +423,8 @@ namespace AzureDevOpsDashboard.Services
 
                 _logger.LogInformation("Fetching Releases for org: {Organization}, project: {Project}", organization, project);
 
-                // Get all releases
-                var releasesUrl = $"https://vsrm.dev.azure.com/{organization}/{project}/_apis/release/releases?$expand=environments&api-version=6.0";
+                // Updated URL to include artifacts in the response
+                var releasesUrl = $"https://vsrm.dev.azure.com/{organization}/{project}/_apis/release/releases?$expand=environments,artifacts&api-version=6.0";
                 _logger.LogInformation("Requesting releases URL: {Url}", releasesUrl);
                 
                 var releasesResponse = await _httpClient.GetAsync(releasesUrl);
@@ -359,37 +433,14 @@ namespace AzureDevOpsDashboard.Services
                 
                 releasesResponse.EnsureSuccessStatusCode();
                 
-                var releases = new List<Release>();
                 var releasesData = JsonSerializer.Deserialize<JsonElement>(releasesContent);
 
                 if (releasesData.TryGetProperty("value", out JsonElement releaseValues))
                 {
-                    foreach (var releaseValue in releaseValues.EnumerateArray())
-                    {
-                        var releaseName = GetStringOrEmpty(releaseValue, "name");
-                        var definitionName = GetStringOrEmpty(releaseValue.GetProperty("releaseDefinition"), "name");
-                        
-                        var release = new Release
-                        {
-                            Name = releaseName,
-                            DefinitionName = definitionName,
-                            CreatedOn = releaseValue.GetProperty("createdOn").GetDateTime()
-                        };
-
-                        if (releaseValue.TryGetProperty("environments", out JsonElement environments))
-                        {
-                            foreach (var env in environments.EnumerateArray())
-                            {
-                                release.Stages.Add(MapReleaseStage(env, release.Name));
-                            }
-                        }
-
-                        releases.Add(release);
-                    }
+                    return MapReleases(releaseValues);
                 }
 
-                _logger.LogInformation("Retrieved {Count} releases", releases.Count);
-                return releases;
+                return new List<Release>();
             }
             catch (Exception ex)
             {

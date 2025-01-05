@@ -264,28 +264,50 @@
                     <div class="section">
                         <div class="card">
                             <div class="card-header">
-                                <h2 class="card-title">Releases (@_releases.Count)</h2>
+                                <h2 class="card-title">
+                                    <a href="/releases/@ProjectName" class="text-decoration-none">
+                                        Releases (@_releases.Count)
+                                        <span class="oi oi-arrow-right small ms-2"></span>
+                                    </a>
+                                </h2>
                             </div>
                             <div class="card-body">
                                 @if (_releases.Any())
                                 {
                                     <div class="list mt-3">
-                                        @foreach (var release in _releases)
+                                        @foreach (var release in _releases.Take(5))
                                         {
                                             <div class="release-item mb-3">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <h5 class="mb-1">@release.Name</h5>
+                                                    <h5 class="mb-1">
+                                                        <a href="@GetReleaseUrl(release)" target="_blank">@release.Name</a>
+                                                    </h5>
                                                     <small>@release.CreatedOn?.ToString("MMM dd, yyyy HH:mm")</small>
                                                 </div>
-                                                <div class="text-muted mb-2">Definition: @release.DefinitionName</div>
+                                                <div class="text-muted mb-2">
+                                                    Definition: <a href="@GetDefinitionUrl(release)" target="_blank">@release.DefinitionName</a>
+                                                    @if (!string.IsNullOrEmpty(release.Branch))
+                                                    {
+                                                        <span class="ms-2">| Branch: <span class="badge bg-secondary">@release.FormattedBranch</span></span>
+                                                    }
+                                                </div>
                                                 <div class="stages-list">
                                                     @foreach (var stage in release.Stages)
                                                     {
-                                                        <span class="badge bg-secondary me-2">
+                                                        <span class="badge @GetStatusBadgeClass(stage.Status) me-2">
                                                             @stage.Name: @stage.Status
                                                         </span>
                                                     }
                                                 </div>
+                                            </div>
+                                        }
+                                        @if (_releases.Count > 5)
+                                        {
+                                            <div class="text-center mt-3">
+                                                <a href="/releases/@ProjectName" class="portal-link">
+                                                    <span class="oi oi-arrow-right me-2"></span>
+                                                    View all releases
+                                                </a>
                                             </div>
                                         }
                                     </div>
@@ -551,5 +573,17 @@
                 : category;
             StateHasChanged();
         }
+    }
+
+    private string GetReleaseUrl(Release release)
+    {
+        var organization = Configuration.GetValue<string>("AzureDevOps:Organization") ?? "GovernGold";
+        return $"https://dev.azure.com/{organization}/{ProjectName}/_releaseProgress?_a=release-pipeline-progress&releaseId={release.ReleaseId}";
+    }
+
+    private string GetDefinitionUrl(Release release)
+    {
+        var organization = Configuration.GetValue<string>("AzureDevOps:Organization") ?? "GovernGold";
+        return $"https://dev.azure.com/{organization}/{ProjectName}/_release?definitionId={release.DefinitionId}";
     }
 }

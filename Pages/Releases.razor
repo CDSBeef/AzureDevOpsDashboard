@@ -4,6 +4,8 @@
 @inject IAzureDevOpsService AzureDevOpsService
 @inject ITokenService TokenService
 @inject NavigationManager NavigationManager
+@inject IConfiguration Configuration
+@inject ILogger<Releases> Logger  // Add this line at the top with other injections
 
 <PageTitle>Releases - Azure DevOps Dashboard</PageTitle>
 
@@ -27,24 +29,92 @@ else
     <div class="section">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Releases (@_releases.Count)</h2>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="card-title">Releases (@GetFilteredReleases().Count)</h2>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="search-filter">
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Search releases..."
+                                   @bind="_searchText" 
+                                   @bind:event="oninput" />
+                        </div>
+                        <div class="definition-filter">
+                            <select class="form-select" @bind="_selectedDefinition">
+                                <option value="">All Definitions</option>
+                                @foreach (var definition in _definitions)
+                                {
+                                    <option value="@definition">@definition</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="stage-filter">
+                            <select class="form-select" @bind="_selectedStage">
+                                <option value="">All Stages</option>
+                                @foreach (var stage in _stages)
+                                {
+                                    <option value="@stage">@stage</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="status-filter">
+                            <select class="form-select" @bind="_selectedStatus">
+                                <option value="">All Statuses</option>
+                                @foreach (var status in _statuses)
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="branch-filter">
+                            <select class="form-select" @bind="_selectedBranch">
+                                <option value="">All Branches</option>
+                                @foreach (var branch in _branches)
+                                {
+                                    <option value="@branch">@branch</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" @onclick="RefreshData" title="Refresh releases">
+                            @if (_loading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-reload"></span>
+                                <span>Refresh</span>
+                            }
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
-                @if (_releases.Any())
+                @if (GetFilteredReleases().Any())
                 {
                     <div class="list mt-3">
-                        @foreach (var release in _releases)
+                        @foreach (var release in GetFilteredReleases())
                         {
                             <div class="release-item mb-3">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-1">@release.Name</h5>
+                                    <h5 class="mb-1">
+                                        <a href="@GetReleaseUrl(release)" target="_blank">@release.Name</a>
+                                    </h5>
                                     <small>@release.CreatedOn?.ToString("MMM dd, yyyy HH:mm")</small>
                                 </div>
-                                <div class="text-muted mb-2">Definition: @release.DefinitionName</div>
+                                <div class="text-muted mb-2">
+                                    Definition: <a href="@GetDefinitionUrl(release)" target="_blank">@release.DefinitionName</a>
+                                    @if (!string.IsNullOrEmpty(release.Branch))
+                                    {
+                                        <span class="ms-2">| Branch: <span class="badge bg-secondary">@release.FormattedBranch</span></span>
+                                    }
+                                </div>
                                 <div class="stages-list">
                                     @foreach (var stage in release.Stages)
                                     {
-                                        <span class="badge bg-secondary me-2">
+                                        <span class="badge @GetStatusBadgeClass(stage.Status) me-2">
                                             @stage.Name: @stage.Status
                                         </span>
                                     }
@@ -71,6 +141,15 @@ else
     private List<Release> _releases = new();
     private bool _loading = true;
     private string? _error;
+    private string _searchText = "";
+    private string _selectedDefinition = "";
+    private string _selectedStage = "";
+    private string _selectedStatus = "";
+    private string _selectedBranch = "";
+    private HashSet<string> _definitions = new();
+    private HashSet<string> _stages = new();
+    private HashSet<string> _statuses = new();
+    private HashSet<string> _branches = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,17 +160,102 @@ else
             return;
         }
 
+        await LoadReleasesAsync();
+    }
+
+    private async Task LoadReleasesAsync()
+    {
         try
         {
+            _loading = true;
             _releases = await AzureDevOpsService.GetReleasesAsync(ProjectName);
+            
+            // Log all releases and their branch information
+            foreach (var release in _releases)
+            {
+                Logger.LogInformation("Release {Name} (ID: {Id}) - Branch: {Branch}", 
+                    release.Name, 
+                    release.ReleaseId,
+                    string.IsNullOrEmpty(release.Branch) ? "NO BRANCH" : release.Branch);
+            }
+            
+            // Populate filter options
+            _definitions = new HashSet<string>(_releases.Select(r => r.DefinitionName));
+            _stages = new HashSet<string>(_releases.SelectMany(r => r.Stages.Select(s => s.Name)));
+            _statuses = new HashSet<string>(_releases.SelectMany(r => r.Stages.Select(s => s.Status)));
+            _branches = new HashSet<string>(_releases
+                .Where(r => !string.IsNullOrEmpty(r.Branch))
+                .Select(r => r.FormattedBranch));
+
+            Logger.LogInformation("Found {Count} unique branches", _branches.Count);
+            foreach (var branch in _branches)
+            {
+                Logger.LogInformation("Available branch: {Branch}", branch);
+            }
         }
         catch (Exception ex)
         {
             _error = ex.Message;
+            Logger.LogError(ex, "Error loading releases");
         }
         finally
         {
             _loading = false;
         }
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadReleasesAsync();
+    }
+
+    private List<Release> GetFilteredReleases()
+    {
+        return _releases
+            .Where(r => string.IsNullOrEmpty(_searchText) || 
+                       r.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                       r.DefinitionName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.IsNullOrEmpty(_selectedDefinition) || r.DefinitionName == _selectedDefinition)
+            .Where(r => string.IsNullOrEmpty(_selectedStage) || 
+                       r.Stages.Any(s => s.Name == _selectedStage))
+            .Where(r => string.IsNullOrEmpty(_selectedStatus) || 
+                       r.Stages.Any(s => s.Status == _selectedStatus))
+            .Where(r => string.IsNullOrEmpty(_selectedBranch) || 
+                       r.FormattedBranch == _selectedBranch)
+            .ToList();
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "succeeded" => "bg-success",
+            "failed" => "bg-danger",
+            "inprogress" or "in progress" => "bg-info",
+            "canceled" => "bg-warning",
+            "notstarted" or "not started" => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetReleaseUrl(Release release)
+    {
+        var organization = Configuration.GetValue<string>("AzureDevOps:Organization") ?? "GovernGold";
+        // Changed to point to the specific release instead of definition
+        return $"https://dev.azure.com/{organization}/{ProjectName}/_releaseProgress?_a=release-pipeline-progress&releaseId={release.ReleaseId}";
+    }
+
+    private string GetDefinitionUrl(Release release)
+    {
+        var organization = Configuration.GetValue<string>("AzureDevOps:Organization") ?? "GovernGold";
+        return $"https://dev.azure.com/{organization}/{ProjectName}/_release?definitionId={GetDefinitionId(release)}";
+    }
+
+    private string GetDefinitionId(Release release)
+    {
+        // Extract definition ID from the release name or use a default
+        // This is a simplified approach - you might want to add a DefinitionId property to your Release class
+        var parts = release.Name.Split('-');
+        return parts.Length > 1 && int.TryParse(parts[1], out _) ? parts[1] : "1";
     }
 }
