@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace AzureDevOpsDashboard.Data;
 
 public class BuildInfo
@@ -23,9 +25,30 @@ public class BuildInfo
     public int DefinitionId { get; set; }
     public Repository? Repository { get; set; }
 
-    public string DisplayName => string.IsNullOrEmpty(Message) 
-        ? BuildNumber 
-        : $"{BuildNumber} - {Message}";
+    public string DisplayName
+    {
+        get
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(TriggerInfo))
+                {
+                    using JsonDocument document = JsonDocument.Parse(TriggerInfo);
+                    if (document.RootElement.TryGetProperty("ci.message", out JsonElement messageElement))
+                    {
+                        var message = messageElement.GetString();
+                        if (!string.IsNullOrEmpty(message))
+                        {
+                            return $"{BuildNumber} - {message}";
+                        }
+                    }
+                }
+            }
+            catch { } // If any parsing fails, fall back to BuildNumber
+
+            return BuildNumber;
+        }
+    }
 
     public TimeSpan? Duration => StartTime.HasValue && FinishTime.HasValue 
         ? FinishTime.Value - StartTime.Value 

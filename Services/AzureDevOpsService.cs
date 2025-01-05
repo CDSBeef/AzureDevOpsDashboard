@@ -222,15 +222,25 @@ namespace AzureDevOpsDashboard.Services
             var project = build.GetProperty("project");
             var definition = build.GetProperty("definition");
             var repository = build.GetProperty("repository");
+            var buildId = build.GetProperty("id").GetInt32();
 
             string GetStringOrEmpty(JsonElement element, string propertyName)
             {
                 return element.TryGetProperty(propertyName, out var prop) ? prop.GetString() ?? string.Empty : string.Empty;
             }
 
-            return new BuildInfo
+            string GetTriggerInfo(JsonElement element)
             {
-                Id = build.GetProperty("id").GetInt32(),
+                if (element.TryGetProperty("triggerInfo", out var triggerInfo))
+                {
+                    return triggerInfo.GetRawText();
+                }
+                return "{}";
+            }
+
+            var buildInfo = new BuildInfo
+            {
+                Id = buildId,
                 BuildNumber = GetStringOrEmpty(build, "buildNumber"),
                 Definition = GetStringOrEmpty(definition, "name"),
                 Status = GetStringOrEmpty(build, "status"),
@@ -243,6 +253,7 @@ namespace AzureDevOpsDashboard.Services
                 Organization = _organization,
                 Project = GetStringOrEmpty(project, "name"),
                 DefinitionId = definition.GetProperty("id").GetInt32(),
+                TriggerInfo = GetTriggerInfo(build),
                 Repository = new Repository 
                 { 
                     Id = GetStringOrEmpty(repository, "id"),
@@ -250,6 +261,11 @@ namespace AzureDevOpsDashboard.Services
                     Url = GetStringOrEmpty(repository, "url")
                 }
             };
+
+            // Add FormattedUrl
+            buildInfo.FormattedUrl = $"https://dev.azure.com/{_organization}/{buildInfo.Project}/_build/results?buildId={buildInfo.Id}";
+
+            return buildInfo;
         }
 
         public async Task<List<ReleaseStage>> GetReleaseStagesAsync(string project)
