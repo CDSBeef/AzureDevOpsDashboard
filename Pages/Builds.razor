@@ -1,4 +1,4 @@
-@page "/builds"
+@page "/builds/{ProjectName}"
 @using AzureDevOpsDashboard.Services
 @using AzureDevOpsDashboard.Data
 @inject IAzureDevOpsService AzureDevOpsService
@@ -137,6 +137,9 @@ else
 }
 
 @code {
+    [Parameter]
+    public required string ProjectName { get; set; }
+
     private List<BuildInfo> _builds = new();
     private List<ChartData> _buildsByStatus = new();
     private bool _loading = true;
@@ -165,9 +168,15 @@ else
             return;
         }
 
+        await LoadBuildsAsync();
+    }
+
+    private async Task LoadBuildsAsync()
+    {
         try
         {
-            _builds = await AzureDevOpsService.GetBuildsAsync();
+            _loading = true;
+            _builds = await AzureDevOpsService.GetBuildsAsync(ProjectName);
             _buildResults = new HashSet<string>(_builds.Select(b => b.Result).Where(r => !string.IsNullOrEmpty(r)));
             _pipelines = new HashSet<string>(_builds.Select(b => b.Definition).Where(d => !string.IsNullOrEmpty(d)));
             _branches = new HashSet<string>(_builds.Select(b => b.FormattedBranch).Where(b => !string.IsNullOrEmpty(b)));
@@ -185,26 +194,7 @@ else
 
     private async Task RefreshData()
     {
-        try
-        {
-            _loading = true;
-            StateHasChanged();  // Add this to show loading state immediately
-            
-            _builds = await AzureDevOpsService.GetBuildsAsync();
-            _buildResults = new HashSet<string>(_builds.Select(b => b.Result).Where(r => !string.IsNullOrEmpty(r)));
-            _pipelines = new HashSet<string>(_builds.Select(b => b.Definition).Where(d => !string.IsNullOrEmpty(d)));
-            _branches = new HashSet<string>(_builds.Select(b => b.FormattedBranch).Where(b => !string.IsNullOrEmpty(b)));
-            _buildsByStatus = GetFilteredBuildChart();
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _loading = false;
-            StateHasChanged();
-        }
+        await LoadBuildsAsync();
     }
 
     private List<BuildInfo> GetFilteredBuilds()

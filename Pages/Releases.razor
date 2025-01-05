@@ -1,4 +1,4 @@
-@page "/releases"
+@page "/releases/{ProjectName}"
 @using AzureDevOpsDashboard.Services
 @using AzureDevOpsDashboard.Data
 @inject IAzureDevOpsService AzureDevOpsService
@@ -65,6 +65,9 @@ else
 }
 
 @code {
+    [Parameter]
+    public required string ProjectName { get; set; }
+
     private List<Release> _releases = new();
     private bool _loading = true;
     private string? _error;
@@ -80,7 +83,7 @@ else
 
         try
         {
-            _releases = await AzureDevOpsService.GetReleasesAsync();
+            _releases = await AzureDevOpsService.GetReleasesAsync(ProjectName);
         }
         catch (Exception ex)
         {

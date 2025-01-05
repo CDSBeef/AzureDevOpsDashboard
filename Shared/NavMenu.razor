@@ -4,28 +4,28 @@
 @implements IDisposable
 
 <nav class="top-nav">
-    <div class="nav-group">
-        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-            Overview
-        </NavLink>
-    </div>
-
-    @if (_hasToken)
+    @if (_hasToken && !string.IsNullOrEmpty(ProjectName))
     {
         <div class="nav-group">
-            <NavLink class="nav-link" href="pullrequests">
+            <NavLink class="nav-link" href="@($"/dashboard/{ProjectName}")" Match="NavLinkMatch.All">
+                Overview
+            </NavLink>
+        </div>
+
+        <div class="nav-group">
+            <NavLink class="nav-link" href="@($"/pullrequests/{ProjectName}")">
                 Pull Requests
             </NavLink>
 
-            <NavLink class="nav-link" href="builds">
+            <NavLink class="nav-link" href="@($"/builds/{ProjectName}")">
                 Builds
             </NavLink>
 
-            <NavLink class="nav-link" href="releasestages">
+            <NavLink class="nav-link" href="@($"/releasestages/{ProjectName}")">
                 Release Stages
             </NavLink>
 
-            <NavLink class="nav-link" href="releases">
+            <NavLink class="nav-link" href="@($"/releases/{ProjectName}")">
                 Releases
             </NavLink>
         </div>
@@ -33,6 +33,9 @@
 </nav>
 
 @code {
+    [Parameter]
+    public string? ProjectName { get; set; }
+
     private bool _hasToken;
 
     protected override async Task OnInitializedAsync()

@@ -53,13 +53,12 @@ namespace AzureDevOpsDashboard.Services
             }
         }
 
-        public async Task<List<PullRequest>> GetPullRequestsAsync()
+        public async Task<List<PullRequest>> GetPullRequestsAsync(string project)
         {
             try
             {
                 await SetupHttpClientAsync();
                 var organization = _configuration["AzureDevOps:Organization"];
-                var project = _configuration["AzureDevOps:Project"];
 
                 if (string.IsNullOrEmpty(organization) || string.IsNullOrEmpty(project))
                 {
@@ -160,13 +159,12 @@ namespace AzureDevOpsDashboard.Services
             }
         }
 
-        public async Task<List<BuildInfo>> GetBuildsAsync()
+        public async Task<List<BuildInfo>> GetBuildsAsync(string project)
         {
             try
             {
                 await SetupHttpClientAsync();
                 var organization = _configuration["AzureDevOps:Organization"];
-                var project = _configuration["AzureDevOps:Project"];
 
                 if (string.IsNullOrEmpty(organization) || string.IsNullOrEmpty(project))
                 {
@@ -254,13 +252,12 @@ namespace AzureDevOpsDashboard.Services
             };
         }
 
-        public async Task<List<ReleaseStage>> GetReleaseStagesAsync()
+        public async Task<List<ReleaseStage>> GetReleaseStagesAsync(string project)
         {
             try
             {
                 await SetupHttpClientAsync();
                 var organization = _configuration["AzureDevOps:Organization"];
-                var project = _configuration["AzureDevOps:Project"];
 
                 _logger.LogInformation("Fetching Releases for org: {Organization}, project: {Project}", organization, project);
 
@@ -327,13 +324,12 @@ namespace AzureDevOpsDashboard.Services
             }
         }
 
-        public async Task<List<Release>> GetReleasesAsync()
+        public async Task<List<Release>> GetReleasesAsync(string project)
         {
             try
             {
                 await SetupHttpClientAsync();
                 var organization = _configuration["AzureDevOps:Organization"];
-                var project = _configuration["AzureDevOps:Project"];
 
                 _logger.LogInformation("Fetching Releases for org: {Organization}, project: {Project}", organization, project);
 
@@ -401,6 +397,46 @@ namespace AzureDevOpsDashboard.Services
         private static string GetStringOrEmpty(JsonElement element, string propertyName)
         {
             return element.TryGetProperty(propertyName, out var prop) ? prop.GetString() ?? string.Empty : string.Empty;
+        }
+
+        public async Task<List<Project>> GetProjectsAsync()
+        {
+            try
+            {
+                await SetupHttpClientAsync();
+                var url = $"https://dev.azure.com/{_organization}/_apis/projects?api-version=7.0";
+                
+                _logger.LogInformation("Fetching projects from URL: {Url}", url);
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+                
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                var projects = new List<Project>();
+
+                if (result.TryGetProperty("value", out JsonElement valueElement))
+                {
+                    foreach (var proj in valueElement.EnumerateArray())
+                    {
+                        projects.Add(new Project
+                        {
+                            Id = proj.GetProperty("id").GetString() ?? string.Empty,
+                            Name = proj.GetProperty("name").GetString() ?? string.Empty,
+                            Description = proj.TryGetProperty("description", out var desc) ? desc.GetString() ?? string.Empty : string.Empty,
+                            Url = proj.GetProperty("url").GetString() ?? string.Empty,
+                            State = proj.GetProperty("state").GetString() ?? string.Empty,
+                            Visibility = proj.GetProperty("visibility").GetString() ?? string.Empty
+                        });
+                    }
+                }
+
+                return projects;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get projects");
+                throw;
+            }
         }
     }
 }

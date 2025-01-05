@@ -39,6 +39,12 @@ builder.Services.AddHttpsRedirection(options =>
     options.HttpsPort = 5001;
 });
 
+// Validate configuration
+if (string.IsNullOrEmpty(builder.Configuration["AzureDevOps:Organization"]))
+{
+    throw new InvalidOperationException("AzureDevOps:Organization configuration is required");
+}
+
 // Configure logging
 builder.Logging.ClearProviders();
 builder.Logging.SetMinimumLevel(LogLevel.Trace);

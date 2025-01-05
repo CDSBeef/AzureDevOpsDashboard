@@ -1,0 +1,275 @@
+@using AzureDevOpsDashboard.Data
+@using AzureDevOpsDashboard.Services
+@inject IAzureDevOpsService AzureDevOpsService
+@inject NavigationManager NavigationManager
+
+<div class="project-selection">
+    <div class="project-selection-header">
+        <h2>Select a Project</h2>
+        @if (!string.IsNullOrEmpty(_searchText))
+        {
+            <div class="search-results">
+                Showing results for: @_searchText
+            </div>
+        }
+    </div>
+
+    <div class="project-search">
+        <div class="search-box">
+            <span class="oi oi-magnifying-glass"></span>
+            <input type="text" 
+                   placeholder="Search projects..."
+                   @bind="_searchText" 
+                   @bind:event="oninput" />
+        </div>
+    </div>
+    
+    @if (_loading)
+    {
+        <div class="loading-projects">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading projects...</span>
+            </div>
+            <span>Loading projects...</span>
+        </div>
+    }
+    else if (_error != null)
+    {
+        <div class="alert alert-danger">
+            <h4>Error</h4>
+            <p>@_error</p>
+            <button class="btn btn-primary" @onclick="LoadProjects">Retry</button>
+        </div>
+    }
+    else if (GetFilteredProjects().Any())
+    {
+        <div class="projects-grid">
+            @foreach (var project in GetFilteredProjects())
+            {
+                <div class="project-card @(_hoveredProject == project ? "hovered" : "")"
+                     @onclick="() => SelectProject(project)"
+                     @onmouseenter="() => _hoveredProject = project"
+                     @onmouseleave="() => _hoveredProject = null">
+                    <div class="project-icon">
+                        <span class="oi oi-project"></span>
+                    </div>
+                    <div class="project-content">
+                        <h3>@project.Name</h3>
+                        <p>@(string.IsNullOrEmpty(project.Description) ? "No description available" : project.Description)</p>
+                        <div class="project-footer">
+                            <span class="badge bg-@GetVisibilityBadgeClass(project.Visibility)">
+                                @project.Visibility
+                            </span>
+                            <span class="badge bg-@GetStateBadgeClass(project.State)">
+                                @project.State
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="no-projects">
+            <span class="oi oi-warning"></span>
+            <p>No projects found @(!string.IsNullOrEmpty(_searchText) ? "matching your search" : "in your Azure DevOps organization")</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Project> _projects = new();
+    private bool _loading = true;
+    private string? _error;
+    private string _searchText = "";
+    private Project? _hoveredProject;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjects();
+    }
+
+    private async Task LoadProjects()
+    {
+        try
+        {
+            _loading = true;
+            _error = null;
+            _projects = await AzureDevOpsService.GetProjectsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private List<Project> GetFilteredProjects()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+            return _projects;
+
+        return _projects
+            .Where(p => p.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                       p.Description.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private void SelectProject(Project project)
+    {
+        NavigationManager.NavigateTo($"/dashboard/{project.Name}");
+    }
+
+    private string GetVisibilityBadgeClass(string visibility) => visibility.ToLower() switch
+    {
+        "private" => "info",
+        "public" => "success",
+        _ => "secondary"
+    };
+
+    private string GetStateBadgeClass(string state) => state.ToLower() switch
+    {
+        "wellformed" => "success",
+        "deleting" => "danger",
+        "new" => "info",
+        "unchanged" => "secondary",
+        _ => "secondary"
+    };
+}
+
+<style>
+    .project-selection {
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .project-selection-header {
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+
+    .project-search {
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: center;
+    }
+
+    .search-box {
+        position: relative;
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 1rem 1rem 1rem 3rem;
+        border: 2px solid var(--border-color);
+        border-radius: 2rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+
+    .search-box .oi {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+    .projects-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+    }
+
+    .project-card {
+        background: var(--card-background);
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 200px;
+        border: 2px solid transparent;
+    }
+
+    .project-card:hover, .project-card.hovered {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        border-color: var(--primary-color);
+    }
+
+    .project-icon {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        color: var(--primary-color);
+        opacity: 0.2;
+        font-size: 2rem;
+    }
+
+    .project-content {
+        padding: 1.5rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .project-content h3 {
+        margin: 0 0 1rem 0;
+        color: var(--text-primary);
+        font-size: 1.25rem;
+    }
+
+    .project-content p {
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+        flex: 1;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .project-footer {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: auto;
+    }
+
+    .loading-projects {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        padding: 3rem;
+    }
+
+    .no-projects {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-secondary);
+    }
+
+    .no-projects .oi {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .search-results {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+</style>

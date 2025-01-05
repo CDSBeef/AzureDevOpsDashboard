@@ -11,14 +11,21 @@
             <span class="oi oi-code" aria-hidden="true"></span>
             Azure DevOps
         </div>
-        <NavMenu />
+        <NavMenu ProjectName="@_currentProjectName" />
         <div class="top-actions">
+            @if (_hasToken && !string.IsNullOrEmpty(ProjectName))
+            {
+                <button class="btn btn-link" @onclick="NavigateToProjects">
+                    <span class="oi oi-project me-2"></span>
+                    Change Project
+                </button>
+            }
             <div class="search">
                 <input type="text" placeholder="Search..." />
             </div>
-            <a href="https://dev.azure.com" target="_blank" class="portal-link">
-                <span class="oi oi-external-link me-2"></span>
-                Azure DevOps Portal
+            <a href="javascript:void(0)" class="portal-link" @onclick="NavigateToProjects">
+                <span class="oi oi-grid-three-up me-2"></span>
+                Projects
             </a>
             @if (_hasToken)
             {
@@ -39,10 +46,15 @@
 
 @code {
     private bool _hasToken;
+    private string? _currentProjectName;
+
+    [Parameter]
+    public string? ProjectName { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         _hasToken = !string.IsNullOrEmpty(await TokenService.GetTokenAsync());
+        SetCurrentProject();
         TokenStateService.OnTokenSet += async () => await InvokeAsync(() => 
         { 
             _hasToken = true; 
@@ -50,9 +62,38 @@
         });
         TokenStateService.OnTokenCleared += async () => await InvokeAsync(() => 
         { 
-            _hasToken = false; 
+            _hasToken = false;
+            _currentProjectName = null;
             StateHasChanged(); 
         });
+    }
+
+    protected override void OnParametersSet()
+    {
+        SetCurrentProject();
+        StateHasChanged();
+    }
+
+    private void SetCurrentProject()
+    {
+        var uri = NavigationManager.Uri;
+        var segments = uri.Split('/');
+        
+        // Look for project name in URL segments
+        for (int i = 0; i < segments.Length - 1; i++)
+        {
+            if (segments[i] is "dashboard" or "builds" or "pullrequests" or "releases" or "releasestages")
+            {
+                _currentProjectName = segments[i + 1];
+                break;
+            }
+        }
+        
+        // Also update from parameter if available
+        if (!string.IsNullOrEmpty(ProjectName))
+        {
+            _currentProjectName = ProjectName;
+        }
     }
 
     private async Task HandleLogout()
@@ -60,5 +101,11 @@
         await TokenService.ClearTokenAsync();
         TokenStateService.NotifyTokenCleared();
         NavigationManager.NavigateTo("/", true);
+    }
+
+    private void NavigateToProjects()
+    {
+        _currentProjectName = null;
+        NavigationManager.NavigateTo("/");
     }
 }

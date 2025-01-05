@@ -1,4 +1,5 @@
 ﻿@page "/"
+@page "/dashboard/{ProjectName}"
 @using AzureDevOpsDashboard.Services
 @using AzureDevOpsDashboard.Data
 @inject IAzureDevOpsService AzureDevOpsService
@@ -59,249 +60,259 @@
     
     @if (_tokenVerified)
     {
-        @if (_loading)
+        @if (string.IsNullOrEmpty(ProjectName))
         {
-            <div class="loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        }
-        else if (_error != null)
-        {
-            <div class="alert alert-danger">
-                <h4>Error</h4>
-                <p>@_error</p>
-                <button class="btn btn-primary" @onclick="RefreshData">Retry</button>
-            </div>
+            <ProjectSelection />
         }
         else
         {
-            <div class="dashboard">
-                <div class="section">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <a href="/pullrequests" class="text-decoration-none">
-                                    Pull Requests (@_pullRequests.Count)
-                                    <span class="oi oi-arrow-right small ms-2"></span>
-                                </a>
-                            </h2>
-                        </div>
-                        <div class="card-body">
-                            @if (_pullRequestsByStatus.Any())
-                            {
-                                <div style="height: 300px">
-                                    <RadzenChart>
-                                        <RadzenPieSeries Data="@_pullRequestsByStatus" CategoryProperty="Category" ValueProperty="Count" />
-                                    </RadzenChart>
-                                </div>
-                                <div class="list mt-3">
-                                    @foreach (var pr in _pullRequests.Take(5))
-                                    {
-                                        <div class="item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <h5 class="mb-1">
-                                                        <a href="@pr.FormattedUrl" target="_blank">@pr.Title</a>
-                                                    </h5>
-                                                    <div class="text-muted">
-                                                        Repository: <a href="@pr.FormattedRepoUrl" target="_blank">@(pr.Repository?.Name ?? "Unknown")</a>
-                                                        @if (!string.IsNullOrEmpty(pr.SourceRefName))
-                                                        {
-                                                            <span class="ms-2">| @(GetBranchName(pr.SourceRefName)) → @(GetBranchName(pr.TargetRefName ?? ""))</span>
-                                                        }
-                                                    </div>
-                                                </div>
-                                                <span class="badge bg-primary">@pr.Status</span>
-                                            </div>
-                                            <div class="text-muted small">
-                                                Created by @(pr.CreatedBy?.DisplayName ?? "Unknown") on @pr.CreationDate.ToString("MMM dd, yyyy")
-                                            </div>
-                                        </div>
-                                    }
-                                    @if (_pullRequests.Count > 5)
-                                    {
-                                        <div class="text-center mt-3">
-                                            <a href="/pullrequests" class="portal-link">
-                                                <span class="oi oi-arrow-right me-2"></span>
-                                                View all pull requests
-                                            </a>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="alert alert-info">
-                                    No pull requests found
-                                </div>
-                            }
-                        </div>
+            @if (_loading)
+            {
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
                 </div>
-
-                <div class="section">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <a href="/builds" class="text-decoration-none">
-                                    Build Status (@_builds.Count)
-                                    <span class="oi oi-arrow-right small ms-2"></span>
-                                </a>
-                            </h2>
-                        </div>
-                        <div class="card-body">
-                            @if (_buildsByStatus.Any())
-                            {
-                                <div style="height: 300px">
-                                    <RadzenChart>
-                                        <RadzenPieSeries Data="@_buildsByStatus" 
-                                                       CategoryProperty="Category" 
-                                                       ValueProperty="Count"
-                                                       Title="Build Status" />
-                                    </RadzenChart>
-                                </div>
-                                <div class="list mt-3">
-                                    @foreach (var build in _builds.Take(5))
-                                    {
-                                        <div class="item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <h5 class="mb-1">
-                                                        <a href="@build.FormattedUrl" target="_blank">@build.DisplayName</a>
-                                                    </h5>
-                                                    <div class="text-muted">
-                                                        Pipeline: <a href="@GetPipelineUrl(build)" target="_blank">@build.Definition</a>
-                                                        @if (!string.IsNullOrEmpty(build.SourceBranch))
-                                                        {
-                                                            <span class="ms-2">| Branch: <a href="@GetBranchUrl(build)" target="_blank">@build.FormattedBranch</a></span>
-                                                        }
+            }
+            else if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <h4>Error</h4>
+                    <p>@_error</p>
+                    <button class="btn btn-primary" @onclick="RefreshData">Retry</button>
+                </div>
+            }
+            else
+            {
+                <div class="dashboard">
+                    <div class="section">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">
+                                    <a href="/pullrequests/@ProjectName" class="text-decoration-none">
+                                        Pull Requests (@_pullRequests.Count)
+                                        <span class="oi oi-arrow-right small ms-2"></span>
+                                    </a>
+                                </h2>
+                            </div>
+                            <div class="card-body">
+                                @if (_pullRequestsByStatus.Any())
+                                {
+                                    <div style="height: 300px">
+                                        <RadzenChart>
+                                            <RadzenPieSeries Data="@_pullRequestsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                                        </RadzenChart>
+                                    </div>
+                                    <div class="list mt-3">
+                                        @foreach (var pr in _pullRequests.Take(5))
+                                        {
+                                            <div class="item">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h5 class="mb-1">
+                                                            <a href="@pr.FormattedUrl" target="_blank">@pr.Title</a>
+                                                        </h5>
+                                                        <div class="text-muted">
+                                                            Repository: <a href="@pr.FormattedRepoUrl" target="_blank">@(pr.Repository?.Name ?? "Unknown")</a>
+                                                            @if (!string.IsNullOrEmpty(pr.SourceRefName))
+                                                            {
+                                                                <span class="ms-2">| @(GetBranchName(pr.SourceRefName)) → @(GetBranchName(pr.TargetRefName ?? ""))</span>
+                                                            }
+                                                        </div>
                                                     </div>
+                                                    <span class="badge bg-primary">@pr.Status</span>
                                                 </div>
-                                                <span class="badge @GetStatusBadgeClass(build.Result)">@build.Result</span>
-                                            </div>
-                                            <div class="build-details mt-2">
                                                 <div class="text-muted small">
-                                                    <span class="me-3">Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")</span>
-                                                    <span>Duration: @build.DurationDisplay</span>
+                                                    Created by @(pr.CreatedBy?.DisplayName ?? "Unknown") on @pr.CreationDate.ToString("MMM dd, yyyy")
                                                 </div>
                                             </div>
-                                        </div>
-                                    }
-                                    @if (_builds.Count > 5)
-                                    {
-                                        <div class="text-center mt-3">
-                                            <a href="/builds" class="portal-link">
-                                                <span class="oi oi-arrow-right me-2"></span>
-                                                View all builds
-                                            </a>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="alert alert-info">
-                                    No builds found
-                                </div>
-                            }
+                                        }
+                                        @if (_pullRequests.Count > 5)
+                                        {
+                                            <div class="text-center mt-3">
+                                                <a href="/pullrequests/@ProjectName" class="portal-link">
+                                                    <span class="oi oi-arrow-right me-2"></span>
+                                                    View all pull requests
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info">
+                                        No pull requests found
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">
+                                    <a href="/builds/@ProjectName" class="text-decoration-none">
+                                        Build Status (@_builds.Count)
+                                        <span class="oi oi-arrow-right small ms-2"></span>
+                                    </a>
+                                </h2>
+                            </div>
+                            <div class="card-body">
+                                @if (_buildsByStatus.Any())
+                                {
+                                    <div style="height: 300px">
+                                        <RadzenChart>
+                                            <RadzenPieSeries Data="@_buildsByStatus" 
+                                                           CategoryProperty="Category" 
+                                                           ValueProperty="Count"
+                                                           Title="Build Status" />
+                                        </RadzenChart>
+                                    </div>
+                                    <div class="list mt-3">
+                                        @foreach (var build in _builds.Take(5))
+                                        {
+                                            <div class="item">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h5 class="mb-1">
+                                                            <a href="@build.FormattedUrl" target="_blank">@build.DisplayName</a>
+                                                        </h5>
+                                                        <div class="text-muted">
+                                                            Pipeline: <a href="@GetPipelineUrl(build)" target="_blank">@build.Definition</a>
+                                                            @if (!string.IsNullOrEmpty(build.SourceBranch))
+                                                            {
+                                                                <span class="ms-2">| Branch: <a href="@GetBranchUrl(build)" target="_blank">@build.FormattedBranch</a></span>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                    <span class="badge @GetStatusBadgeClass(build.Result)">@build.Result</span>
+                                                </div>
+                                                <div class="build-details mt-2">
+                                                    <div class="text-muted small">
+                                                        <span class="me-3">Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")</span>
+                                                        <span>Duration: @build.DurationDisplay</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                        @if (_builds.Count > 5)
+                                        {
+                                            <div class="text-center mt-3">
+                                                <a href="/builds/@ProjectName" class="portal-link">
+                                                    <span class="oi oi-arrow-right me-2"></span>
+                                                    View all builds
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info">
+                                        No builds found
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">Release Stages (@_releaseStages.Count)</h2>
+                            </div>
+                            <div class="card-body">
+                                @if (_releaseStages.Any())
+                                {
+                                    <div style="height: 300px">
+                                        <RadzenChart>
+                                            <RadzenColumnSeries Data="@_releaseStagesByStatus" 
+                                                                CategoryProperty="Category" 
+                                                                ValueProperty="Count"
+                                                                Title="Release Stages" />
+                                        </RadzenChart>
+                                    </div>
+                                    <div class="list mt-3">
+                                        @foreach (var stage in _releaseStages)
+                                        {
+                                            <div class="item">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="fw-bold">@stage.ReleaseName - @stage.StageName</span>
+                                                    <span class="badge bg-info">@stage.Status</span>
+                                                </div>
+                                                <div class="text-muted small">
+                                                    @if (stage.LastReleaseDate.HasValue)
+                                                    {
+                                                        <span>Last Release: @stage.LastReleaseDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info">
+                                        No release stages found
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">Releases (@_releases.Count)</h2>
+                            </div>
+                            <div class="card-body">
+                                @if (_releases.Any())
+                                {
+                                    <div class="list mt-3">
+                                        @foreach (var release in _releases)
+                                        {
+                                            <div class="release-item mb-3">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <h5 class="mb-1">@release.Name</h5>
+                                                    <small>@release.CreatedOn?.ToString("MMM dd, yyyy HH:mm")</small>
+                                                </div>
+                                                <div class="text-muted mb-2">Definition: @release.DefinitionName</div>
+                                                <div class="stages-list">
+                                                    @foreach (var stage in release.Stages)
+                                                    {
+                                                        <span class="badge bg-secondary me-2">
+                                                            @stage.Name: @stage.Status
+                                                        </span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info">
+                                        No releases found
+                                    </div>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="section">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">Release Stages (@_releaseStages.Count)</h2>
-                        </div>
-                        <div class="card-body">
-                            @if (_releaseStages.Any())
-                            {
-                                <div style="height: 300px">
-                                    <RadzenChart>
-                                        <RadzenColumnSeries Data="@_releaseStagesByStatus" 
-                                                            CategoryProperty="Category" 
-                                                            ValueProperty="Count"
-                                                            Title="Release Stages" />
-                                    </RadzenChart>
-                                </div>
-                                <div class="list mt-3">
-                                    @foreach (var stage in _releaseStages)
-                                    {
-                                        <div class="item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span class="fw-bold">@stage.ReleaseName - @stage.StageName</span>
-                                                <span class="badge bg-info">@stage.Status</span>
-                                            </div>
-                                            <div class="text-muted small">
-                                                @if (stage.LastReleaseDate.HasValue)
-                                                {
-                                                    <span>Last Release: @stage.LastReleaseDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="alert alert-info">
-                                    No release stages found
-                                </div>
-                            }
-                        </div>
-                    </div>
+                <div class="mt-3">
+                    <button class="btn btn-secondary" @onclick="RefreshData" disabled="@string.IsNullOrEmpty(_token)">Refresh Data</button>
                 </div>
-
-                <div class="section">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">Releases (@_releases.Count)</h2>
-                        </div>
-                        <div class="card-body">
-                            @if (_releases.Any())
-                            {
-                                <div class="list mt-3">
-                                    @foreach (var release in _releases)
-                                    {
-                                        <div class="release-item mb-3">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h5 class="mb-1">@release.Name</h5>
-                                                <small>@release.CreatedOn?.ToString("MMM dd, yyyy HH:mm")</small>
-                                            </div>
-                                            <div class="text-muted mb-2">Definition: @release.DefinitionName</div>
-                                            <div class="stages-list">
-                                                @foreach (var stage in release.Stages)
-                                                {
-                                                    <span class="badge bg-secondary me-2">
-                                                        @stage.Name: @stage.Status
-                                                    </span>
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="alert alert-info">
-                                    No releases found
-                                </div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-3">
-                <button class="btn btn-secondary" @onclick="RefreshData" disabled="@string.IsNullOrEmpty(_token)">Refresh Data</button>
-            </div>
+            }
         }
     }
 </div>
 
 @code {
+    [Parameter]
+    public string? ProjectName { get; set; }
+
     private string _token = string.Empty;
     private List<PullRequest> _pullRequests = new();
     private List<BuildInfo> _builds = new();
@@ -344,6 +355,14 @@
         {
             Logger.LogError(ex, "Error during initialization");
             _error = ex.Message;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(ProjectName))
+        {
+            await RefreshData();
         }
     }
 
@@ -400,6 +419,11 @@
             return;
         }
 
+        if (string.IsNullOrEmpty(ProjectName))
+        {
+            return;
+        }
+
         try
         {
             _loading = true;
@@ -409,10 +433,10 @@
             // Attempt to get data - if any request fails with 401, reset token
             try
             {
-                _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
-                _builds = await AzureDevOpsService.GetBuildsAsync();
-                _releaseStages = await AzureDevOpsService.GetReleaseStagesAsync();
-                _releases = await AzureDevOpsService.GetReleasesAsync();
+                _pullRequests = await AzureDevOpsService.GetPullRequestsAsync(ProjectName);
+                _builds = await AzureDevOpsService.GetBuildsAsync(ProjectName);
+                _releaseStages = await AzureDevOpsService.GetReleaseStagesAsync(ProjectName);
+                _releases = await AzureDevOpsService.GetReleasesAsync(ProjectName);
             }
             catch (HttpRequestException ex) when (ex.Message.Contains("401"))
             {

@@ -1,4 +1,4 @@
-@page "/pullrequests"
+@page "/pullrequests/{ProjectName}"
 @using AzureDevOpsDashboard.Services
 @using AzureDevOpsDashboard.Data
 @inject IAzureDevOpsService AzureDevOpsService
@@ -100,6 +100,9 @@
 </div>
 
 @code {
+    [Parameter]
+    public required string ProjectName { get; set; }
+
     private List<PullRequest> _pullRequests = new();
     private HashSet<string> _repositories = new();
     private string _selectedRepository = "";
@@ -117,7 +120,7 @@
         var token = await TokenService.GetTokenAsync();
         if (string.IsNullOrEmpty(token))
         {
-            NavigationManager.NavigateTo("/");
+            NavigationManager.NavigateTo("/"); 
             return;
         }
 
@@ -131,7 +134,7 @@
             _loading = true;
             StateHasChanged();  // Add this to show loading state immediately
             
-            _pullRequests = await AzureDevOpsService.GetPullRequestsAsync();
+            _pullRequests = await AzureDevOpsService.GetPullRequestsAsync(ProjectName);
             _repositories = new HashSet<string>(_pullRequests
                 .Where(pr => pr.Repository?.Name != null)
                 .Select(pr => pr.Repository!.Name!)

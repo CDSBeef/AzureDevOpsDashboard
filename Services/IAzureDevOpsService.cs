@@ -6,9 +6,10 @@ namespace AzureDevOpsDashboard.Services
 {
     public interface IAzureDevOpsService
     {
-        Task<List<PullRequest>> GetPullRequestsAsync();
-        Task<List<BuildInfo>> GetBuildsAsync();
-        Task<List<ReleaseStage>> GetReleaseStagesAsync();  // Make sure this exact signature exists
-        Task<List<Release>> GetReleasesAsync();
+        Task<List<Project>> GetProjectsAsync();  // New method
+        Task<List<PullRequest>> GetPullRequestsAsync(string project);  // Modified to accept project
+        Task<List<BuildInfo>> GetBuildsAsync(string project);  // Modified to accept project
+        Task<List<ReleaseStage>> GetReleaseStagesAsync(string project);  // Modified to accept project
+        Task<List<Release>> GetReleasesAsync(string project);  // Modified to accept project
     }
 }

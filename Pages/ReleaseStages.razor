@@ -1,4 +1,4 @@
-@page "/releasestages"
+@page "/releasestages/{ProjectName}"
 @using AzureDevOpsDashboard.Services
 @using AzureDevOpsDashboard.Data
 @inject IAzureDevOpsService AzureDevOpsService
@@ -63,6 +63,9 @@ else
 }
 
 @code {
+    [Parameter]
+    public required string ProjectName { get; set; }
+
     private List<ReleaseStage> _stages = new();
     private List<ChartData> _stagesByStatus = new();
     private bool _loading = true;
@@ -85,7 +88,7 @@ else
 
         try
         {
-            _stages = await AzureDevOpsService.GetReleaseStagesAsync();
+            _stages = await AzureDevOpsService.GetReleaseStagesAsync(ProjectName);
             _stagesByStatus = _stages
                 .GroupBy(s => s.Status)
                 .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
