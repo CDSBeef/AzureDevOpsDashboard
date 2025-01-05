@@ -27,26 +27,100 @@ else
     <div class="section">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Build Status (@_builds.Count)</h2>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="card-title">Build Status (@GetFilteredBuilds().Count)</h2>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="search-filter">
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Search builds..."
+                                   @bind="_searchText" 
+                                   @bind:event="oninput" />
+                        </div>
+                        <div class="status-filter">
+                            <select class="form-select" @bind="_selectedStatus">
+                                <option value="">All Results</option>
+                                @foreach (var result in _buildResults)
+                                {
+                                    <option value="@result">@result</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="branch-filter">
+                            <select class="form-select" @bind="_selectedBranch">
+                                <option value="">All Branches</option>
+                                @foreach (var branch in _branches)
+                                {
+                                    <option value="@branch">@branch</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="pipeline-filter">
+                            <select class="form-select" @bind="_selectedPipeline">
+                                <option value="">All Pipelines</option>
+                                @foreach (var pipeline in _pipelines)
+                                {
+                                    <option value="@pipeline">@pipeline</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" @onclick="RefreshData" title="Refresh builds">
+                            @if (_loading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-reload"></span>
+                                <span>Refresh</span>
+                            }
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
-                @if (_buildsByStatus.Any())
+                @if (GetFilteredBuilds().Any())
                 {
                     <div style="height: 300px">
-                        <RadzenChart>
-                            <RadzenPieSeries Data="@_buildsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                        <RadzenChart SeriesClick="@OnChartClick">
+                            <RadzenPieSeries Data="@GetFilteredBuildChart()" 
+                                           CategoryProperty="Category" 
+                                           ValueProperty="Count" />
                         </RadzenChart>
                     </div>
                     <div class="list mt-3">
-                        @foreach (var build in _builds)
+                        @foreach (var build in GetFilteredBuilds())
                         {
-                            <div class="build-item mb-3">
+                            <div class="item">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-1">@build.Id</h5>
-                                    <span class="badge bg-secondary">@build.Status</span>
+                                    <div>
+                                        <h5 class="mb-1">
+                                            <a href="@build.FormattedUrl" target="_blank">@build.DisplayName</a>
+                                        </h5>
+                                        <div class="text-muted">
+                                            Pipeline: <a href="@GetPipelineUrl(build)" target="_blank">@build.Definition</a>
+                                            @if (!string.IsNullOrEmpty(build.SourceBranch))
+                                            {
+                                                <span class="ms-2">| Branch: <a href="@GetBranchUrl(build)" target="_blank">@build.FormattedBranch</a></span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <span class="badge @GetStatusBadgeClass(build.Result)">@build.Result</span>
                                 </div>
-                                <div class="text-muted">Pipeline: @build.Definition</div>
-                                <small>Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")</small>
+                                <div class="build-details mt-2">
+                                    <div class="text-muted small">
+                                        <span class="me-3">Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")</span>
+                                        <span>Duration: @build.DurationDisplay</span>
+                                    </div>
+                                    <div class="text-muted small">
+                                        Requested by: @build.RequestedForDisplayName
+                                    </div>
+                                    <div class="text-muted small">
+                                        Reason: @build.Reason
+                                    </div>
+                                </div>
                             </div>
                         }
                     </div>
@@ -67,6 +141,14 @@ else
     private List<ChartData> _buildsByStatus = new();
     private bool _loading = true;
     private string? _error;
+    private string _searchText = "";
+    private string _selectedStatus = "";
+    private string _selectedPipeline = "";
+    private string _selectedBranch = "";
+    private HashSet<string> _buildStatuses = new();
+    private HashSet<string> _pipelines = new();
+    private HashSet<string> _buildResults = new();
+    private HashSet<string> _branches = new();
 
     private class ChartData
     {
@@ -86,10 +168,10 @@ else
         try
         {
             _builds = await AzureDevOpsService.GetBuildsAsync();
-            _buildsByStatus = _builds
-                .GroupBy(b => b.Status)
-                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
-                .ToList();
+            _buildResults = new HashSet<string>(_builds.Select(b => b.Result).Where(r => !string.IsNullOrEmpty(r)));
+            _pipelines = new HashSet<string>(_builds.Select(b => b.Definition).Where(d => !string.IsNullOrEmpty(d)));
+            _branches = new HashSet<string>(_builds.Select(b => b.FormattedBranch).Where(b => !string.IsNullOrEmpty(b)));
+            _buildsByStatus = GetFilteredBuildChart();
         }
         catch (Exception ex)
         {
@@ -99,5 +181,82 @@ else
         {
             _loading = false;
         }
+    }
+
+    private async Task RefreshData()
+    {
+        try
+        {
+            _loading = true;
+            StateHasChanged();  // Add this to show loading state immediately
+            
+            _builds = await AzureDevOpsService.GetBuildsAsync();
+            _buildResults = new HashSet<string>(_builds.Select(b => b.Result).Where(r => !string.IsNullOrEmpty(r)));
+            _pipelines = new HashSet<string>(_builds.Select(b => b.Definition).Where(d => !string.IsNullOrEmpty(d)));
+            _branches = new HashSet<string>(_builds.Select(b => b.FormattedBranch).Where(b => !string.IsNullOrEmpty(b)));
+            _buildsByStatus = GetFilteredBuildChart();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<BuildInfo> GetFilteredBuilds()
+    {
+        return _builds
+            .Where(b => string.IsNullOrEmpty(_searchText) || 
+                       b.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                       b.RequestedForDisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+            .Where(b => string.IsNullOrEmpty(_selectedStatus) || b.Result == _selectedStatus)
+            .Where(b => string.IsNullOrEmpty(_selectedPipeline) || b.Definition == _selectedPipeline)
+            .Where(b => string.IsNullOrEmpty(_selectedBranch) || b.FormattedBranch == _selectedBranch)
+            .ToList();
+    }
+
+    private List<ChartData> GetFilteredBuildChart()
+    {
+        return GetFilteredBuilds()
+            .GroupBy(b => b.Result)
+            .Select(g => new ChartData { Category = g.Key ?? "Unknown", Count = g.Count() })
+            .ToList();
+    }
+
+    private string GetStatusBadgeClass(string result)
+    {
+        return result.ToLower() switch
+        {
+            "succeeded" => "bg-success",
+            "failed" => "bg-danger",
+            "in_progress" => "bg-info",
+            "canceled" => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void OnChartClick(SeriesClickEventArgs? args)
+    {
+        if (args?.Category is not null)
+        {
+            _selectedStatus = _selectedStatus == args.Category.ToString() ? "" : args.Category.ToString();
+            StateHasChanged();
+        }
+    }
+
+    private string GetPipelineUrl(BuildInfo build)
+    {
+        return $"https://dev.azure.com/{build.Organization}/{build.Project}/_build?definitionId={build.DefinitionId}";
+    }
+
+    private string GetBranchUrl(BuildInfo build)
+    {
+        var repoName = build.Repository?.Name ?? "";
+        var branch = build.SourceBranch?.Replace("refs/heads/", "");
+        return $"https://dev.azure.com/{build.Organization}/{build.Project}/_git/{repoName}?version=GB{branch}";
     }
 }

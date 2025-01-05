@@ -43,9 +43,3 @@ public class CreatedBy
     [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
 }
-
-public class Repository
-{
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-}

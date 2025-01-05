@@ -16,6 +16,7 @@ namespace AzureDevOpsDashboard.Services
         private readonly ITokenService _tokenService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AzureDevOpsService> _logger;
+        private readonly string _organization;
         
         public AzureDevOpsService(HttpClient httpClient, ITokenService tokenService, 
             IConfiguration configuration, ILogger<AzureDevOpsService> logger)
@@ -24,6 +25,7 @@ namespace AzureDevOpsDashboard.Services
             _tokenService = tokenService;
             _configuration = configuration;
             _logger = logger;
+            _organization = configuration["AzureDevOps:Organization"] ?? "GovernGold";
         }
 
         private async Task SetupHttpClientAsync()
@@ -197,14 +199,8 @@ namespace AzureDevOpsDashboard.Services
                     {
                         try
                         {
-                            builds.Add(new BuildInfo
-                            {
-                                Id = build.GetProperty("id").GetInt32(),
-                                Definition = build.GetProperty("definition").GetProperty("name").GetString(),
-                                Status = build.GetProperty("status").GetString(),
-                                StartTime = build.GetProperty("startTime").GetDateTime(),
-                                FinishTime = build.GetProperty("finishTime").GetDateTime()
-                            });
+                            var buildInfo = MapBuild(build);
+                            builds.Add(buildInfo);
                         }
                         catch (Exception ex)
                         {
@@ -221,6 +217,37 @@ namespace AzureDevOpsDashboard.Services
                 _logger.LogError(ex, "Failed to get builds");
                 throw;
             }
+        }
+
+        private BuildInfo MapBuild(JsonElement build)
+        {
+            var project = build.GetProperty("project");
+            var definition = build.GetProperty("definition");
+            var repository = build.GetProperty("repository");
+
+            return new BuildInfo
+            {
+                Id = build.GetProperty("id").GetInt32(),
+                BuildNumber = build.GetProperty("buildNumber").GetString(),
+                Definition = build.GetProperty("definition").GetProperty("name").GetString(),
+                Status = build.GetProperty("status").GetString(),
+                Result = build.GetProperty("result").GetString() ?? "in_progress",
+                StartTime = build.TryGetProperty("startTime", out var startTime) ? startTime.GetDateTime() : null,
+                FinishTime = build.TryGetProperty("finishTime", out var finishTime) ? finishTime.GetDateTime() : null,
+                RequestedForDisplayName = build.GetProperty("requestedFor").GetProperty("displayName").GetString(),
+                Reason = build.GetProperty("reason").GetString(),
+                SourceBranch = build.GetProperty("sourceBranch").GetString(),
+                FormattedUrl = $"https://dev.azure.com/{_organization}/{project}/_build/results?buildId={build.GetProperty("id").GetInt32()}",
+                Organization = _organization,
+                Project = project.GetProperty("name").GetString() ?? "",
+                DefinitionId = definition.GetProperty("id").GetInt32(),
+                Repository = new Repository 
+                { 
+                    Id = repository.GetProperty("id").GetString() ?? "",
+                    Name = repository.GetProperty("name").GetString() ?? "",
+                    Url = repository.GetProperty("url").GetString() ?? ""
+                }
+            };
         }
 
         public async Task<List<ReleaseStage>> GetReleaseStagesAsync()

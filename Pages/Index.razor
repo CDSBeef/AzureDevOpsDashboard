@@ -97,30 +97,36 @@
                                     </RadzenChart>
                                 </div>
                                 <div class="list mt-3">
-                                    @foreach (var pr in _pullRequests.Take(10))
+                                    @foreach (var pr in _pullRequests.Take(5))
                                     {
                                         <div class="item">
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <span class="fw-bold">
-                                                    <a href="@pr.FormattedUrl" target="_blank">@pr.Title</a>
-                                                </span>
+                                                <div>
+                                                    <h5 class="mb-1">
+                                                        <a href="@pr.FormattedUrl" target="_blank">@pr.Title</a>
+                                                    </h5>
+                                                    <div class="text-muted">
+                                                        Repository: <a href="@pr.FormattedRepoUrl" target="_blank">@(pr.Repository?.Name ?? "Unknown")</a>
+                                                        @if (!string.IsNullOrEmpty(pr.SourceRefName))
+                                                        {
+                                                            <span class="ms-2">| @(GetBranchName(pr.SourceRefName)) → @(GetBranchName(pr.TargetRefName ?? ""))</span>
+                                                        }
+                                                    </div>
+                                                </div>
                                                 <span class="badge bg-primary">@pr.Status</span>
                                             </div>
                                             <div class="text-muted small">
                                                 Created by @(pr.CreatedBy?.DisplayName ?? "Unknown") on @pr.CreationDate.ToString("MMM dd, yyyy")
                                             </div>
-                                            <div class="text-muted small">
-                                                Repository: <a href="@pr.FormattedRepoUrl" target="_blank">@(pr.Repository?.Name ?? "Unknown")</a>
-                                            </div>
-                                            <div class="text-muted small">
-                                                @(GetBranchName(pr.SourceRefName ?? "")) → @(GetBranchName(pr.TargetRefName ?? ""))
-                                            </div>
                                         </div>
                                     }
-                                    @if (_pullRequests.Count > 10)
+                                    @if (_pullRequests.Count > 5)
                                     {
                                         <div class="text-center mt-3">
-                                            <a href="/pullrequests" class="btn btn-link">View all pull requests</a>
+                                            <a href="/pullrequests" class="portal-link">
+                                                <span class="oi oi-arrow-right me-2"></span>
+                                                View all pull requests
+                                            </a>
                                         </div>
                                     }
                                 </div>
@@ -138,27 +144,58 @@
                 <div class="section">
                     <div class="card">
                         <div class="card-header">
-                            <h2 class="card-title">Build Status (@_builds.Count)</h2>
+                            <h2 class="card-title">
+                                <a href="/builds" class="text-decoration-none">
+                                    Build Status (@_builds.Count)
+                                    <span class="oi oi-arrow-right small ms-2"></span>
+                                </a>
+                            </h2>
                         </div>
                         <div class="card-body">
                             @if (_buildsByStatus.Any())
                             {
                                 <div style="height: 300px">
                                     <RadzenChart>
-                                        <RadzenColumnSeries Data="@_buildsByStatus" CategoryProperty="Category" ValueProperty="Count" />
+                                        <RadzenPieSeries Data="@_buildsByStatus" 
+                                                       CategoryProperty="Category" 
+                                                       ValueProperty="Count"
+                                                       Title="Build Status" />
                                     </RadzenChart>
                                 </div>
                                 <div class="list mt-3">
-                                    @foreach (var build in _builds)
+                                    @foreach (var build in _builds.Take(5))
                                     {
                                         <div class="item">
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <span class="fw-bold">@build.Definition</span>
-                                                <span class="badge @(build.Status == "succeeded" ? "bg-success" : "bg-danger")">@build.Status</span>
+                                                <div>
+                                                    <h5 class="mb-1">
+                                                        <a href="@build.FormattedUrl" target="_blank">@build.DisplayName</a>
+                                                    </h5>
+                                                    <div class="text-muted">
+                                                        Pipeline: <a href="@GetPipelineUrl(build)" target="_blank">@build.Definition</a>
+                                                        @if (!string.IsNullOrEmpty(build.SourceBranch))
+                                                        {
+                                                            <span class="ms-2">| Branch: <a href="@GetBranchUrl(build)" target="_blank">@build.FormattedBranch</a></span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                <span class="badge @GetStatusBadgeClass(build.Result)">@build.Result</span>
                                             </div>
-                                            <div class="text-muted small">
-                                                Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")
+                                            <div class="build-details mt-2">
+                                                <div class="text-muted small">
+                                                    <span class="me-3">Started: @build.StartTime?.ToString("MMM dd, yyyy HH:mm")</span>
+                                                    <span>Duration: @build.DurationDisplay</span>
+                                                </div>
                                             </div>
+                                        </div>
+                                    }
+                                    @if (_builds.Count > 5)
+                                    {
+                                        <div class="text-center mt-3">
+                                            <a href="/builds" class="portal-link">
+                                                <span class="oi oi-arrow-right me-2"></span>
+                                                View all builds
+                                            </a>
                                         </div>
                                     }
                                 </div>
@@ -393,8 +430,8 @@
                 .ToList();
 
             _buildsByStatus = _builds
-                .GroupBy(b => b.Status)
-                .Select(g => new ChartData { Category = g.Key, Count = g.Count() })
+                .GroupBy(b => b.Result)  // Changed from Status to Result
+                .Select(g => new ChartData { Category = g.Key ?? "Unknown", Count = g.Count() })
                 .ToList();
 
             // Group release stages by status for the chart
@@ -441,5 +478,29 @@
         if (string.IsNullOrEmpty(refName))
             return "Unknown";
         return refName.Replace("refs/heads/", "");
+    }
+
+    private string GetPipelineUrl(BuildInfo build)
+    {
+        return $"https://dev.azure.com/{build.Organization}/{build.Project}/_build?definitionId={build.DefinitionId}";
+    }
+
+    private string GetBranchUrl(BuildInfo build)
+    {
+        var repoName = build.Repository?.Name ?? "";
+        var branch = build.SourceBranch?.Replace("refs/heads/", "");
+        return $"https://dev.azure.com/{build.Organization}/{build.Project}/_git/{repoName}?version=GB{branch}";
+    }
+
+    private string GetStatusBadgeClass(string result)
+    {
+        return result.ToLower() switch
+        {
+            "succeeded" => "bg-success",
+            "failed" => "bg-danger",
+            "in_progress" => "bg-info",
+            "canceled" => "bg-warning",
+            _ => "bg-secondary"
+        };
     }
 }
