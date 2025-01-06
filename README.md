@@ -24,16 +24,12 @@ A real-time dashboard application for monitoring Azure DevOps projects, built wi
 <div align="center">
     <h3>Dashboard Overview</h3>
     <img src="docs/images/dashboard.png" alt="Dashboard Overview" width="800"/>
-    <br/><br/>
     <h3>Project Selection</h3>
-    <img src="docs/images/project.png" alt="Pull Requests View" width="800"/>
-    <br/><br/>    
+    <img src="docs/images/project.png" alt="Pull Requests View" width="800"/>   
     <h3>Pull Requests Management</h3>
     <img src="docs/images/pull-requests.png" alt="Pull Requests View" width="800"/>
-    <br/><br/>
     <h3>Build Pipeline Status</h3>
     <img src="docs/images/builds.png" alt="Build Pipeline Status" width="800"/>
-    <br/><br/>
     <h3>Release Management</h3>
     <img src="docs/images/releases.png" alt="Release Management" width="800"/>
 </div>
